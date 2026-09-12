@@ -7,6 +7,7 @@ MSG_PATTERN = re.compile(
 )
 
 # Mapeamento estrito da EQUIPE OFICIAL DE SEGURANÇAS:
+# Apenas os 5 seguranças de campo:
 # - Marcos Silva (+55 11 99999-0001)
 # - Carlos Oliveira (+55 11 99999-0002)
 # - Alexandre Santos (+55 11 99999-0003 / Alexandre Santos)
@@ -21,6 +22,13 @@ MAPA_CONTATOS = {
     "+55 15 99999-0004": "Lucas Ferreira",
     "Eduardo Lima": "Eduardo Lima",
     "Eduardo Lima": "Eduardo Lima"
+}
+
+# Remetentes expressamente ignorados (portaria, avisos administrativos, etc.)
+REMETENTES_IGNORADOS = {
+    "Servicos Gerais - Terceirizado",
+    "+55 11 99999-0005",
+    "Administracao"
 }
 
 def parse_data_hora(data_str: str, hora_str: str) -> Optional[datetime]:
@@ -66,6 +74,11 @@ def extrair_veiculo(texto: str):
 def identificar_seguranca(remetente: str, texto: str) -> Optional[str]:
     rem = remetente.strip()
     
+    # Ignora imediatamente portaria ou contatos administrativos
+    for ign in REMETENTES_IGNORADOS:
+        if ign in rem:
+            return None
+
     # 1. Prioridade absoluta por contato/número da equipe oficial
     if rem in MAPA_CONTATOS:
         return MAPA_CONTATOS[rem]
@@ -73,6 +86,7 @@ def identificar_seguranca(remetente: str, texto: str) -> Optional[str]:
         if tel in rem:
             return nome
 
+    # 2. Se for outro número desconhecido que não seja portaria
     texto_lower = texto.lower()
     if "carlos oliveira" in texto_lower and "marcos silva" in texto_lower:
         return "Carlos Oliveira"
@@ -130,9 +144,7 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         elif (
             "encerrando" in msg_lower or
             "encerrado" in msg_lower or
-            "encerramento" in msg_lower or
-            "saída pra almoço" in msg_lower or
-            "saida pra almoco" in msg_lower
+            "encerramento" in msg_lower
         ):
             tipo_evento = "FIM"
             
@@ -253,8 +265,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     status = "Concluído"
                     if "parcial" in msg_fim_lower:
                         status = "Encerrado Parcial"
-                    elif "almoço" in msg_fim_lower or "almoco" in msg_fim_lower:
-                        status = "Saída para Almoço"
                         
                     turnos_finais.append({
                         "seguranca": seg,
