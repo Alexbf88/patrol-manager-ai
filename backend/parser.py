@@ -7,12 +7,6 @@ MSG_PATTERN = re.compile(
 )
 
 # Mapeamento estrito da EQUIPE OFICIAL DE SEGURANÇAS:
-# Apenas os 5 seguranças de campo:
-# - Marcos Silva (+55 11 99999-0001)
-# - Carlos Oliveira (+55 11 99999-0002)
-# - Alexandre Santos (+55 11 99999-0003 / Alexandre Santos)
-# - Eduardo Lima (Eduardo Lima / Eduardo Lima)
-# - Lucas Ferreira (+55 15 99999-0004)
 MAPA_CONTATOS = {
     "+55 11 99999-0001": "Marcos Silva",
     "+55 11 99999-0002": "Carlos Oliveira",
@@ -30,6 +24,13 @@ REMETENTES_IGNORADOS = {
     "+55 11 99999-0005",
     "Administracao"
 }
+
+# Regex para extrair horário retroativo mencionado na mensagem
+# Ex: "encerrado as 16.45", "encerrando 17:00", "encerrado 16h30", "encerrei as 18:00"
+HORARIO_RETROATIVO_REGEX = re.compile(
+    r"(?:encerrad[oa]|encerrei|encerramento|sa[ií]da)\s+(?:[aà]s\s+)?(\d{1,2})[:\.hH](\d{2})",
+    re.IGNORECASE
+)
 
 def parse_data_hora(data_str: str, hora_str: str) -> Optional[datetime]:
     partes = data_str.split('/')
@@ -71,35 +72,18 @@ def extrair_veiculo(texto: str):
             
     return tipo, cor
 
-def identificar_seguranca(remetente: str, texto: str) -> Optional[str]:
+def identificar_seguranca(remetente: str) -> Optional[str]:
     rem = remetente.strip()
     
-    # Ignora imediatamente portaria ou contatos administrativos
     for ign in REMETENTES_IGNORADOS:
         if ign in rem:
             return None
 
-    # 1. Prioridade absoluta por contato/número da equipe oficial
     if rem in MAPA_CONTATOS:
         return MAPA_CONTATOS[rem]
     for tel, nome in MAPA_CONTATOS.items():
         if tel in rem:
             return nome
-
-    # 2. Se for outro número desconhecido que não seja portaria
-    texto_lower = texto.lower()
-    if "carlos oliveira" in texto_lower and "marcos silva" in texto_lower:
-        return "Carlos Oliveira"
-    elif "carlos oliveira" in texto_lower:
-        return "Carlos Oliveira"
-    elif "marcos silva" in texto_lower:
-        return "Marcos Silva"
-    elif "alexandre santos" in texto_lower or "alexandre santos" in rem.lower():
-        return "Alexandre Santos"
-    elif "eduardo lima" in texto_lower or "eduardo lima" in texto_lower:
-        return "Eduardo Lima"
-    elif "lucas ferreira" in texto_lower:
-        return "Lucas Ferreira"
         
     return None
 
@@ -126,7 +110,8 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
             continue
 
         rem_limpo = remetente.strip()
-        seguranca = identificar_seguranca(rem_limpo, mensagem)
+        # Identificação estritamente pelo REMETENTE
+        seguranca = identificar_seguranca(rem_limpo)
         if not seguranca:
             continue
 
@@ -161,7 +146,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         })
 
     turnos_finais = []
-    
     msgs_por_seg = {}
     for m in mensagens_chat:
         msgs_por_seg.setdefault(m["seguranca"], []).append(m)
@@ -230,35 +214,79 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
 
         # Para quem declara INICIO / FIM / PARCIAL formalmente (Marcos Silva, Eduardo Lima)
         turno_aberto = None
-        ultima_msg_ativa = None
+        msgs_do_turno_atual = []
         
         for item in msgs:
             tipo = item["tipo_evento"]
             
             if tipo == "INICIO":
+                # Se já tinha um turno aberto que não teve FIM formal:
                 if turno_aberto:
-                    fim_dt = ultima_msg_ativa["datetime"] if ultima_msg_ativa and ultima_msg_ativa["datetime"] > turno_aberto["datetime"] else None
-                    horas = round((fim_dt - turno_aberto["datetime"]).total_seconds() / 3600, 2) if fim_dt else None
-                    status = "Finalizado por última atividade" if horas and 0 <= horas <= 24 else "Sem encerramento"
+                    # Busca a última atividade válida daquele dia
+                    dt_ini = turno_aberto["datetime"]
                     
-                    turnos_finais.append({
-                        "seguranca": seg,
-                        "telefone_origem": turno_aberto["remetente"],
-                        "veiculo_tipo": turno_aberto["veiculo_tipo"],
-                        "veiculo_cor": turno_aberto["veiculo_cor"],
-                        "data_inicio": turno_aberto["datetime"].strftime("%Y-%m-%d %H:%M"),
-                        "data_fim": fim_dt.strftime("%Y-%m-%d %H:%M") if fim_dt else None,
-                        "horas_trabalhadas": horas if horas and 0 <= horas <= 24 else None,
-                        "status": status,
-                        "detalhes": f"Início: {turno_aberto['mensagem']}"
-                    })
+                    # Mensagens enviadas no mesmo dia do início ou até a manhã seguinte (< 16 horas)
+                    msgs_mesmo_turno = [m for m in msgs_do_turno_atual if m["datetime"] > dt_ini and (m["datetime"] - dt_ini).total_seconds() / 3600 <= 16.0]
+                    
+                    if msgs_mesmo_turno:
+                        ultima_msg = msgs_mesmo_turno[-1]
+                        dt_fim = ultima_msg["datetime"]
+                        
+                        # Verifica se na mensagem havia horário retroativo (ex: "encerrado as 16:45")
+                        m_ret = HORARIO_RETROATIVO_REGEX.search(ultima_msg["mensagem"])
+                        if m_ret:
+                            hr_h, hr_m = int(m_ret.group(1)), int(m_ret.group(2))
+                            try:
+                                dt_fim = dt_fim.replace(hour=hr_h, minute=hr_m)
+                            except Exception:
+                                pass
+                                
+                        diff = dt_fim - dt_ini
+                        horas = round(diff.total_seconds() / 3600, 2)
+                        status = "Finalizado por última atividade" if 0 <= horas <= 16 else "Sem encerramento"
+                        
+                        turnos_finais.append({
+                            "seguranca": seg,
+                            "telefone_origem": turno_aberto["remetente"],
+                            "veiculo_tipo": turno_aberto["veiculo_tipo"],
+                            "veiculo_cor": turno_aberto["veiculo_cor"],
+                            "data_inicio": dt_ini.strftime("%Y-%m-%d %H:%M"),
+                            "data_fim": dt_fim.strftime("%Y-%m-%d %H:%M"),
+                            "horas_trabalhadas": horas if 0 <= horas <= 16 else None,
+                            "status": status,
+                            "detalhes": f"Início: {turno_aberto['mensagem']} | Fim estimado: {ultima_msg['mensagem']}"
+                        })
+                    else:
+                        turnos_finais.append({
+                            "seguranca": seg,
+                            "telefone_origem": turno_aberto["remetente"],
+                            "veiculo_tipo": turno_aberto["veiculo_tipo"],
+                            "veiculo_cor": turno_aberto["veiculo_cor"],
+                            "data_inicio": dt_ini.strftime("%Y-%m-%d %H:%M"),
+                            "data_fim": None,
+                            "horas_trabalhadas": None,
+                            "status": "Sem encerramento",
+                            "detalhes": f"Início: {turno_aberto['mensagem']}"
+                        })
                 
                 turno_aberto = item
-                ultima_msg_ativa = item
+                msgs_do_turno_atual = [item]
 
             elif tipo == "FIM":
                 if turno_aberto:
-                    diff = item["datetime"] - turno_aberto["datetime"]
+                    dt_ini = turno_aberto["datetime"]
+                    dt_fim = item["datetime"]
+                    
+                    # Verifica se no texto do fim tem horário retroativo especificado
+                    m_ret = HORARIO_RETROATIVO_REGEX.search(item["mensagem"])
+                    if m_ret:
+                        hr_h, hr_m = int(m_ret.group(1)), int(m_ret.group(2))
+                        try:
+                            dt_fim = dt_fim.replace(hour=hr_h, minute=hr_m)
+                        except Exception:
+                            pass
+                            
+                    diff = dt_fim - dt_ini
                     horas = round(diff.total_seconds() / 3600, 2)
                     
                     msg_fim_lower = item["mensagem"].lower()
@@ -271,14 +299,14 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                         "telefone_origem": turno_aberto["remetente"],
                         "veiculo_tipo": turno_aberto["veiculo_tipo"] or item["veiculo_tipo"],
                         "veiculo_cor": turno_aberto["veiculo_cor"] or item["veiculo_cor"],
-                        "data_inicio": turno_aberto["datetime"].strftime("%Y-%m-%d %H:%M"),
-                        "data_fim": item["datetime"].strftime("%Y-%m-%d %H:%M"),
+                        "data_inicio": dt_ini.strftime("%Y-%m-%d %H:%M"),
+                        "data_fim": dt_fim.strftime("%Y-%m-%d %H:%M"),
                         "horas_trabalhadas": horas if 0 <= horas <= 24 else None,
                         "status": status,
                         "detalhes": f"Início: {turno_aberto['mensagem']} | Fim: {item['mensagem']}"
                     })
                     turno_aberto = None
-                    ultima_msg_ativa = None
+                    msgs_do_turno_atual = []
                 else:
                     turnos_finais.append({
                         "seguranca": seg,
@@ -292,24 +320,42 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                         "detalhes": item["mensagem"]
                     })
             else:
-                ultima_msg_ativa = item
+                # Mensagem intermediária durante o turno
+                msgs_do_turno_atual.append(item)
 
         if turno_aberto:
-            fim_dt = ultima_msg_ativa["datetime"] if ultima_msg_ativa and ultima_msg_ativa["datetime"] > turno_aberto["datetime"] else None
-            horas = round((fim_dt - turno_aberto["datetime"]).total_seconds() / 3600, 2) if fim_dt else None
-            status = "Finalizado por última atividade" if horas and 0 <= horas <= 24 else "Em aberto"
-            
-            turnos_finais.append({
-                "seguranca": seg,
-                "telefone_origem": turno_aberto["remetente"],
-                "veiculo_tipo": turno_aberto["veiculo_tipo"],
-                "veiculo_cor": turno_aberto["veiculo_cor"],
-                "data_inicio": turno_aberto["datetime"].strftime("%Y-%m-%d %H:%M"),
-                "data_fim": fim_dt.strftime("%Y-%m-%d %H:%M") if fim_dt else None,
-                "horas_trabalhadas": horas if horas and 0 <= horas <= 24 else None,
-                "status": status,
-                "detalhes": f"Início: {turno_aberto['mensagem']}"
-            })
+            dt_ini = turno_aberto["datetime"]
+            msgs_mesmo_turno = [m for m in msgs_do_turno_atual if m["datetime"] > dt_ini and (m["datetime"] - dt_ini).total_seconds() / 3600 <= 16.0]
+            if msgs_mesmo_turno:
+                ultima_msg = msgs_mesmo_turno[-1]
+                dt_fim = ultima_msg["datetime"]
+                diff = dt_fim - dt_ini
+                horas = round(diff.total_seconds() / 3600, 2)
+                status = "Finalizado por última atividade" if 0 <= horas <= 16 else "Em aberto"
+                
+                turnos_finais.append({
+                    "seguranca": seg,
+                    "telefone_origem": turno_aberto["remetente"],
+                    "veiculo_tipo": turno_aberto["veiculo_tipo"],
+                    "veiculo_cor": turno_aberto["veiculo_cor"],
+                    "data_inicio": dt_ini.strftime("%Y-%m-%d %H:%M"),
+                    "data_fim": dt_fim.strftime("%Y-%m-%d %H:%M"),
+                    "horas_trabalhadas": horas if 0 <= horas <= 16 else None,
+                    "status": status,
+                    "detalhes": f"Início: {turno_aberto['mensagem']} | Fim estimado: {ultima_msg['mensagem']}"
+                })
+            else:
+                turnos_finais.append({
+                    "seguranca": seg,
+                    "telefone_origem": turno_aberto["remetente"],
+                    "veiculo_tipo": turno_aberto["veiculo_tipo"],
+                    "veiculo_cor": turno_aberto["veiculo_cor"],
+                    "data_inicio": dt_ini.strftime("%Y-%m-%d %H:%M"),
+                    "data_fim": None,
+                    "horas_trabalhadas": None,
+                    "status": "Em aberto",
+                    "detalhes": f"Início: {turno_aberto['mensagem']}"
+                })
 
     turnos_finais.sort(key=lambda x: x["data_inicio"], reverse=True)
     return turnos_finais
