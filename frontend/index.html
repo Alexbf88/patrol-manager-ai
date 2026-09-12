@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Rondas - Controle de Horas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+  <!-- Header -->
+  <header class="bg-slate-800 border-b border-slate-700 py-4 px-6 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="fa-solid fa-shield-halved text-emerald-400 text-2xl"></i>
+        <div>
+          <h1 class="text-xl font-bold tracking-wide">Ronda Marcos Silva</h1>
+          <p class="text-xs text-slate-400">Controle e Auditoria de Horas de Segurança</p>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 text-sm transition shadow-lg shadow-emerald-900/30">
+          <i class="fa-solid fa-file-excel"></i> Baixar Planilha
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-6 space-y-6">
+
+    <!-- Upload Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-sm">
+      <h2 class="text-base font-semibold text-slate-200 mb-2 flex items-center gap-2">
+        <i class="fa-solid fa-cloud-arrow-up text-indigo-400"></i> Importar Histórico do WhatsApp
+      </h2>
+      <p class="text-xs text-slate-400 mb-4">Selecione o arquivo de texto exportado do grupo (.txt) para atualizar os registros.</p>
+      
+      <div class="flex items-center gap-4 flex-wrap">
+        <input type="file" id="arquivoTxt" accept=".txt,.log" class="text-sm text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer">
+        <button id="btnUpload" onclick="fazerUpload()" class="bg-slate-700 hover:bg-slate-600 text-slate-100 font-medium py-2.5 px-5 rounded-lg text-sm transition">
+          Processar e Salvar
+        </button>
+        <span id="uploadStatus" class="text-sm font-medium"></span>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
+        <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-lg text-2xl">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+        <div>
+          <span class="text-xs text-slate-400 font-medium">Total de Horas Registradas</span>
+          <h3 id="kpiHoras" class="text-2xl font-bold text-slate-100">0h</h3>
+        </div>
+      </div>
+      <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
+        <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg text-2xl">
+          <i class="fa-solid fa-person-military-pointing"></i>
+        </div>
+        <div>
+          <span class="text-xs text-slate-400 font-medium">Total de Turnos</span>
+          <h3 id="kpiTurnos" class="text-2xl font-bold text-slate-100">0</h3>
+        </div>
+      </div>
+      <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
+        <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg text-2xl">
+          <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <div>
+          <span class="text-xs text-slate-400 font-medium">Seguranças Ativos</span>
+          <h3 id="kpiSegurancas" class="text-2xl font-bold text-slate-100">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros e Tabela -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm">
+      <div class="p-5 border-b border-slate-700 flex flex-wrap gap-4 items-center justify-between">
+        <h2 class="text-lg font-semibold text-slate-200">Histórico de Turnos</h2>
+        
+        <div class="flex items-center gap-3 flex-wrap">
+          <input type="text" id="filtroNome" placeholder="Filtrar por nome..." oninput="carregarTurnos()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+          <input type="date" id="filtroDataInicio" onchange="carregarTurnos()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+          <button onclick="limparFiltros()" class="text-xs text-slate-400 hover:text-slate-200 underline">Limpar</button>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="bg-slate-900/60 text-slate-400 border-b border-slate-700 text-xs font-semibold uppercase tracking-wider">
+              <th class="py-3.5 px-4">Segurança</th>
+              <th class="py-3.5 px-4">Veículo</th>
+              <th class="py-3.5 px-4">Início</th>
+              <th class="py-3.5 px-4">Fim</th>
+              <th class="py-3.5 px-4">Horas</th>
+              <th class="py-3.5 px-4">Status</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaCorpo" class="divide-y divide-slate-700 text-slate-300">
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-500">Nenhum registro carregado ainda.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Resumo por Segurança -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+      <h2 class="text-base font-semibold text-slate-200 mb-4">Total de Horas por Segurança</h2>
+      <div id="cardsSegurancas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- Preenchido via JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    async function carregarDados() {
+      await Promise.all([carregarTurnos(), carregarResumo()]);
+    }
+
+    async function carregarResumo() {
+      try {
+        const res = await fetch('/api/resumo');
+        const data = await res.json();
+        
+        document.getElementById('kpiHoras').innerText = (data.geral.total_horas || 0) + 'h';
+        document.getElementById('kpiTurnos').innerText = data.geral.total_turnos || 0;
+        document.getElementById('kpiSegurancas').innerText = data.por_seguranca.length || 0;
+
+        const container = document.getElementById('cardsSegurancas');
+        container.innerHTML = '';
+        data.por_seguranca.forEach(s => {
+          container.innerHTML += `
+            <div class="bg-slate-900/80 border border-slate-700/80 rounded-lg p-4">
+              <div class="text-sm font-semibold text-slate-200">${s.seguranca}</div>
+              <div class="text-2xl font-bold text-emerald-400 mt-1">${s.total_horas}h</div>
+              <div class="text-xs text-slate-400 mt-1">${s.total_turnos} turnos (méd. ${s.media_horas}h/turno)</div>
+            </div>
+          `;
+        });
+      } catch (e) {
+        console.error("Erro ao carregar resumo", e);
+      }
+    }
+
+    async function carregarTurnos() {
+      const nome = document.getElementById('filtroNome').value;
+      const dataInicio = document.getElementById('filtroDataInicio').value;
+      
+      let url = '/api/turnos?';
+      if (nome) url += `seguranca=${encodeURIComponent(nome)}&`;
+      if (dataInicio) url += `data_inicio=${encodeURIComponent(dataInicio)}&`;
+
+      try {
+        const res = await fetch(url);
+        const turnos = await res.json();
+        const tbody = document.getElementById('tabelaCorpo');
+        tbody.innerHTML = '';
+
+        if (turnos.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500">Nenhum turno encontrado.</td></tr>`;
+          return;
+        }
+
+        turnos.forEach(t => {
+          let badgeStatus = 'bg-slate-700 text-slate-300';
+          if (t.status === 'Concluído') badgeStatus = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+          else if (t.status.includes('Atenção') || t.status.includes('Sem')) badgeStatus = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+
+          const veiculo = [t.veiculo_tipo, t.veiculo_cor].filter(Boolean).join(' ') || 'Não especificado';
+
+          tbody.innerHTML += `
+            <tr class="hover:bg-slate-700/30 transition">
+              <td class="py-3 px-4 font-medium text-slate-200">${t.seguranca}</td>
+              <td class="py-3 px-4 text-slate-400">${veiculo}</td>
+              <td class="py-3 px-4">${t.data_inicio}</td>
+              <td class="py-3 px-4">${t.data_fim || '-'}</td>
+              <td class="py-3 px-4 font-semibold text-emerald-400">${t.horas_trabalhadas ? t.horas_trabalhadas + 'h' : '-'}</td>
+              <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${badgeStatus}">${t.status}</span></td>
+            </tr>
+          `;
+        });
+      } catch (e) {
+        console.error("Erro ao carregar turnos", e);
+      }
+    }
+
+    async function fazerUpload() {
+      const fileInput = document.getElementById('arquivoTxt');
+      const status = document.getElementById('uploadStatus');
+      const btn = document.getElementById('btnUpload');
+
+      if (!fileInput.files.length) {
+        alert("Por favor, selecione um arquivo .txt");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      btn.disabled = true;
+      status.innerText = "Processando mensagens...";
+      status.className = "text-sm text-indigo-400 font-medium";
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+          status.innerText = data.mensagem;
+          status.className = "text-sm text-emerald-400 font-medium";
+          await carregarDados();
+        } else {
+          status.innerText = data.detail || "Erro no upload.";
+          status.className = "text-sm text-rose-400 font-medium";
+        }
+      } catch (e) {
+        status.innerText = "Falha de conexão com a API.";
+        status.className = "text-sm text-rose-400 font-medium";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function exportarExcel() {
+      const nome = document.getElementById('filtroNome').value;
+      const dataInicio = document.getElementById('filtroDataInicio').value;
+      let url = '/api/exportar?';
+      if (nome) url += `seguranca=${encodeURIComponent(nome)}&`;
+      if (dataInicio) url += `data_inicio=${encodeURIComponent(dataInicio)}&`;
+      window.location.href = url;
+    }
+
+    function limparFiltros() {
+      document.getElementById('filtroNome').value = '';
+      document.getElementById('filtroDataInicio').value = '';
+      carregarTurnos();
+    }
+
+    window.onload = carregarDados;
+  </script>
+</body>
+</html>
