@@ -9,8 +9,11 @@ MSG_PATTERN = re.compile(
     r"^(\d{1,2}/\d{1,2}/\d{2,4}),?\s+(\d{1,2}:\d{2})\s*-\s*([^:]+):\s*(.*)$"
 )
 
-# Mapa fixo por numero/remetente identificado no grupo
-MAPA_REMETENTES = {
+# Mapeamento rigoroso e prioritário por NÚMERO / CONTATO
+# Carlos Oliveira e Marcos Silva sao irmaos e tem numeros distintos:
+# +55 11 99999-0002 -> Carlos Oliveira
+# +55 11 99999-0001 -> Marcos Silva
+MAPA_CONTATOS = {
     "+55 11 99999-0001": "Marcos Silva",
     "+55 11 99999-0002": "Carlos Oliveira",
     "+55 15 99999-0004": "Lucas Ferreira",
@@ -60,36 +63,34 @@ def extrair_veiculo(texto: str):
             
     return tipo, cor
 
-def normalizar_seguranca(remetente: str, texto: str) -> str:
+def identificar_seguranca(remetente: str, texto: str) -> str:
     rem = remetente.strip()
+    
+    # 1. Prioridade absoluta: O NUMERO TELEFONICO / CONTATO
+    if rem in MAPA_CONTATOS:
+        return MAPA_CONTATOS[rem]
+
     texto_lower = texto.lower()
     
-    # 1. Checa se o remetente ja tem apelido cadastrado
-    if rem in MAPA_REMETENTES:
-        return MAPA_REMETENTES[rem]
-
-    # 2. Se houver nome no texto
-    nomes = [
-        ("marcos silva", "Marcos Silva"),
-        ("eduardo lima", "Eduardo Lima"),
-        ("eduardo lima", "Eduardo Lima"),
-        ("alexandre santos", "Alexandre Santos"),
-        ("carlos oliveira", "Carlos Oliveira"),
-        ("lucas ferreira", "Lucas Ferreira"),
-        ("apoio operacional", "Apoio Operacional"),
-        ("apoio", "Apoio Operacional"),
-        ("santos", "Santos")
-    ]
-    for chave, nome_padrao in nomes:
-        if chave in texto_lower or chave in rem.lower():
-            return nome_padrao
-            
+    # 2. Se for um numero nao mapeado mas o texto indicar o nome
+    if "carlos oliveira" in texto_lower:
+        return "Carlos Oliveira"
+    elif "marcos silva" in texto_lower:
+        return "Marcos Silva"
+    elif "eduardo lima" in texto_lower or "eduardo lima" in texto_lower:
+        return "Eduardo Lima"
+    elif "alexandre santos" in texto_lower:
+        return "Alexandre Santos"
+    elif "lucas ferreira" in texto_lower:
+        return "Lucas Ferreira"
+    elif "apoio operacional" in texto_lower or "apoio" in texto_lower:
+        return "Apoio Operacional"
+        
     return rem
 
 def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
     linhas = conteudo_texto.splitlines()
     
-    # 1. Parse de todas as mensagens do chat
     mensagens_chat = []
     dt_min = datetime.strptime(data_minima, "%Y-%m-%d") if data_minima else None
 
@@ -107,7 +108,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         if not dt:
             continue
             
-        # Filtro de data minima se configurado
         if dt_min and dt < dt_min:
             continue
 
@@ -133,7 +133,7 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         ):
             tipo_evento = "FIM"
             
-        seguranca = normalizar_seguranca(remetente, mensagem)
+        seguranca = identificar_seguranca(remetente, mensagem)
         v_tipo, v_cor = extrair_veiculo(mensagem)
         
         mensagens_chat.append({
@@ -146,17 +146,17 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
             "veiculo_cor": v_cor
         })
 
-    # 2. Casamento de turnos
+    # Casamento de turnos
     turnos_finais = []
     abertos: Dict[str, Dict[str, Any]] = {}
     ultima_msg_por_seguranca: Dict[str, Dict[str, Any]] = {}
 
     for item in mensagens_chat:
+        # A chave unica do seguranca eh o nome identificado pelo numero
         seg = item["seguranca"]
         tipo = item["tipo_evento"]
         
         if tipo == "INICIO":
-            # Se ja havia um turno aberto deste seguranca sem "FIM", fechamos com a ultima mensagem antes desse novo inicio
             if seg in abertos:
                 turno_antigo = abertos[seg]
                 ultima_msg = ultima_msg_por_seguranca.get(seg)
@@ -216,8 +216,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     "detalhes": f"Início: {turno_inicio['mensagem']} | Fim: {item['mensagem']}"
                 })
             else:
-                # Encerramento avulso (ex: iniciou no dia anterior ao filtro ou mensagem inicial perdida)
-                # Tenta pegar a primeira mensagem do dia desse seguranca se existir
                 turnos_finais.append({
                     "seguranca": seg,
                     "telefone_origem": item["remetente"],
@@ -231,10 +229,8 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                 })
             ultima_msg_por_seguranca[seg] = item
         else:
-            # Mensagem durante o servico (localizacao, aviso de viatura, etc)
             ultima_msg_por_seguranca[seg] = item
 
-    # Restantes em aberto no final do arquivo
     for seg, turno in abertos.items():
         ultima_msg = ultima_msg_por_seguranca.get(seg)
         if ultima_msg and ultima_msg["datetime"] > turno["datetime"]:
