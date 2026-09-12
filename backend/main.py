@@ -34,6 +34,19 @@ def formatar_data_br(data_iso_str: Optional[str]) -> str:
     except Exception:
         return data_iso_str
 
+def formatar_horas_hm(horas_decimal: Optional[float]) -> str:
+    if horas_decimal is None or horas_decimal < 0:
+        return "-"
+    total_minutos = round(horas_decimal * 60)
+    h = total_minutos // 60
+    m = total_minutos % 60
+    if h > 0 and m > 0:
+        return f"{h}h{m:02d}m"
+    elif h > 0:
+        return f"{h}h"
+    else:
+        return f"{m}m"
+
 @app.post("/api/upload")
 async def upload_chat(file: UploadFile = File(...)):
     if not file.filename.endswith(('.txt', '.log')):
@@ -66,6 +79,7 @@ def get_turnos(
     for t in turnos:
         t["data_inicio_br"] = formatar_data_br(t.get("data_inicio"))
         t["data_fim_br"] = formatar_data_br(t.get("data_fim"))
+        t["horas_formatadas"] = formatar_horas_hm(t.get("horas_trabalhadas"))
     return turnos
 
 @app.get("/api/resumo")
@@ -74,7 +88,13 @@ def get_resumo(
     data_inicio: Optional[str] = Query(None),
     data_fim: Optional[str] = Query(None)
 ):
-    return obter_resumo(seguranca=seguranca, data_inicio=data_inicio, data_fim=data_fim)
+    resumo = obter_resumo(seguranca=seguranca, data_inicio=data_inicio, data_fim=data_fim)
+    if resumo.get("geral"):
+        resumo["geral"]["total_horas_formatadas"] = formatar_horas_hm(resumo["geral"].get("total_horas"))
+    for s in resumo.get("por_seguranca", []):
+        s["total_horas_formatadas"] = formatar_horas_hm(s.get("total_horas"))
+        s["media_horas_formatadas"] = formatar_horas_hm(s.get("media_horas"))
+    return resumo
 
 @app.get("/api/exportar")
 def exportar_excel(
@@ -89,6 +109,7 @@ def exportar_excel(
     for t in turnos:
         t["data_inicio"] = formatar_data_br(t.get("data_inicio"))
         t["data_fim"] = formatar_data_br(t.get("data_fim"))
+        t["duracao_formatada"] = formatar_horas_hm(t.get("horas_trabalhadas"))
 
     df = pd.DataFrame(turnos)
     
@@ -100,7 +121,8 @@ def exportar_excel(
         "veiculo_cor": "Cor Veículo",
         "data_inicio": "Início Turno (DD/MM/AAAA HH:MM)",
         "data_fim": "Fim Turno (DD/MM/AAAA HH:MM)",
-        "horas_trabalhadas": "Horas Trabalhadas",
+        "duracao_formatada": "Duração (Horas e Minutos)",
+        "horas_trabalhadas": "Horas (Decimal)",
         "status": "Status",
         "detalhes": "Mensagens Originais"
     }
