@@ -7,12 +7,15 @@ MSG_PATTERN = re.compile(
 )
 
 # Mapeamento rigoroso e prioritário por NÚMERO / CONTATO
+# Alexandre Santos: 11999990001 / contato 'Alexandre Santos'
 MAPA_CONTATOS = {
     "+55 11 99999-0001": "Marcos Silva",
     "+55 11 99999-0002": "Carlos Oliveira",
+    "+55 11 99999-0003": "Alexandre Santos",
+    "+55 11 999990001": "Alexandre Santos",
+    "Alexandre Santos": "Alexandre Santos",
     "+55 15 99999-0004": "Lucas Ferreira",
     "+55 11 99999-0005": "Apoio Operacional",
-    "Alexandre Santos": "Alexandre Santos",
     "Eduardo Lima": "Eduardo Lima",
     "Eduardo Lima": "Eduardo Lima",
     "Servicos Gerais - Terceirizado": "Servicos Gerais"
@@ -61,9 +64,12 @@ def extrair_veiculo(texto: str):
 def identificar_seguranca(remetente: str, texto: str) -> Optional[str]:
     rem = remetente.strip()
     
-    # Prioridade absoluta por contato/número
+    # 1. Prioridade absoluta por contato/número
     if rem in MAPA_CONTATOS:
         return MAPA_CONTATOS[rem]
+    for tel, nome in MAPA_CONTATOS.items():
+        if tel in rem:
+            return nome
 
     texto_lower = texto.lower()
     if "carlos oliveira" in texto_lower and "marcos silva" in texto_lower:
@@ -72,10 +78,10 @@ def identificar_seguranca(remetente: str, texto: str) -> Optional[str]:
         return "Carlos Oliveira"
     elif "marcos silva" in texto_lower:
         return "Marcos Silva"
+    elif "alexandre santos" in texto_lower or "alexandre santos" in rem.lower():
+        return "Alexandre Santos"
     elif "eduardo lima" in texto_lower or "eduardo lima" in texto_lower:
         return "Eduardo Lima"
-    elif "alexandre santos" in texto_lower:
-        return "Alexandre Santos"
     elif "lucas ferreira" in texto_lower:
         return "Lucas Ferreira"
     elif "apoio operacional" in texto_lower or "apoio" in texto_lower:
@@ -115,7 +121,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         msg_lower = mensagem.lower()
         tipo_evento = None
         
-        # Reconhece início e reinício após almoço/parcial
         if (
             "iniciando" in msg_lower or
             "reiniciando" in msg_lower or
@@ -124,7 +129,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         ):
             tipo_evento = "INICIO"
             
-        # Reconhece término, encerramento parcial e saída para almoço
         elif (
             "encerrando" in msg_lower or
             "encerrado" in msg_lower or
@@ -154,10 +158,11 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         msgs_por_seg.setdefault(m["seguranca"], []).append(m)
 
     for seg, msgs in msgs_por_seg.items():
-        # Casos especiais: Lucas Ferreira e Carlos Oliveira
-        # que operam majoritariamente por envio de fotos / relatos diários de ronda
-        if seg in ["Carlos Oliveira", "Lucas Ferreira"]:
-            # Agrupar por blocos contínuos (intervalo max de 4.5h entre fotos)
+        # Para Alexandre Santos, Carlos Oliveira e Lucas Ferreira:
+        # Freqüentemente realizam o serviço enviando as fotos das rondas ao longo do turno,
+        # sem mandar "iniciando" e "encerrando" formal todo dia.
+        # Agrupamos por blocos contínuos de ronda (intervalo <= 4 horas entre fotos/mensagens)
+        if seg in ["Alexandre Santos", "Carlos Oliveira", "Lucas Ferreira"]:
             blocos = []
             bloco_atual = []
             
@@ -166,8 +171,16 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     bloco_atual.append(m)
                 else:
                     diff_horas = (m["datetime"] - bloco_atual[-1]["datetime"]).total_seconds() / 3600
-                    if diff_horas <= 4.5:
+                    # Se mandou "iniciando" explicitamente, força início de novo bloco
+                    if m["tipo_evento"] == "INICIO" and bloco_atual:
+                        blocos.append(bloco_atual)
+                        bloco_atual = [m]
+                    elif diff_horas <= 4.0:
                         bloco_atual.append(m)
+                        # Se mandou "encerrando", fecha o bloco aqui
+                        if m["tipo_evento"] == "FIM":
+                            blocos.append(bloco_atual)
+                            bloco_atual = []
                     else:
                         blocos.append(bloco_atual)
                         bloco_atual = [m]
@@ -180,7 +193,7 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                 diff = dt_fim - dt_ini
                 horas = round(diff.total_seconds() / 3600, 2)
                 
-                # Se postou só 1 foto, considera 0.5h padrão
+                # Se postou apenas 1 mensagem avulsa
                 if horas == 0:
                     horas = 0.5
                     
@@ -190,8 +203,12 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     if t and not v_t: v_t = t
                     if c and not v_c: v_c = c
                     
+                # Se Alexandre Santos tiver veiculo padrão histórico (ex moto)
+                if seg == "Alexandre Santos" and not v_t:
+                    v_t = "Moto"
+                    
                 status = "Concluído"
-                if any("encerrando" in it["mensagem"].lower() or "encerramento" in it["mensagem"].lower() for it in b):
+                if any(it.get("tipo_evento") == "FIM" for it in b):
                     status = "Concluído"
                 else:
                     status = "Ronda por registro fotográfico"
@@ -205,11 +222,11 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     "data_fim": dt_fim.strftime("%Y-%m-%d %H:%M"),
                     "horas_trabalhadas": horas,
                     "status": status,
-                    "detalhes": f"{len(b)} fotos/registros no período"
+                    "detalhes": f"{len(b)} fotos/registros de ronda no período"
                 })
             continue
 
-        # Para quem declara INICIO / FIM / PARCIAL formalmente (Marcos Silva, Eduardo Lima, Alexandre Santos, Servicos Gerais, Apoio)
+        # Para quem declara INICIO / FIM / PARCIAL formalmente (Marcos Silva, Eduardo Lima, Servicos Gerais, Apoio)
         turno_aberto = None
         ultima_msg_ativa = None
         
@@ -217,7 +234,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
             tipo = item["tipo_evento"]
             
             if tipo == "INICIO":
-                # Se já tinha um turno aberto, fecha o anterior com a última mensagem ativa
                 if turno_aberto:
                     fim_dt = ultima_msg_ativa["datetime"] if ultima_msg_ativa and ultima_msg_ativa["datetime"] > turno_aberto["datetime"] else None
                     horas = round((fim_dt - turno_aberto["datetime"]).total_seconds() / 3600, 2) if fim_dt else None
@@ -264,7 +280,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     turno_aberto = None
                     ultima_msg_ativa = None
                 else:
-                    # Encerramento avulso
                     turnos_finais.append({
                         "seguranca": seg,
                         "telefone_origem": item["remetente"],
