@@ -45,6 +45,35 @@
       </div>
     </div>
 
+    <!-- Barra de Filtros Global (impacta KPIs, Resumo e Tabela) -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+            <i class="fa-solid fa-filter text-indigo-400"></i> Filtros de Período e Segurança
+          </h2>
+          <p class="text-xs text-slate-400">Selecione o intervalo de datas ou segurança para recalcular as horas e a tabela.</p>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-medium">De:</label>
+            <input type="date" id="filtroDataInicio" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-medium">Até:</label>
+            <input type="date" id="filtroDataFim" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="filtroNome" placeholder="Segurança..." oninput="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 w-36">
+          </div>
+          <button onclick="limparFiltros()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-300 transition">
+            Limpar Filtros
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- KPIs -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
@@ -52,7 +81,7 @@
           <i class="fa-solid fa-clock"></i>
         </div>
         <div>
-          <span class="text-xs text-slate-400 font-medium">Total de Horas Registradas</span>
+          <span class="text-xs text-slate-400 font-medium">Horas no Período Selecionado</span>
           <h3 id="kpiHoras" class="text-2xl font-bold text-slate-100">0h</h3>
         </div>
       </div>
@@ -61,7 +90,7 @@
           <i class="fa-solid fa-person-military-pointing"></i>
         </div>
         <div>
-          <span class="text-xs text-slate-400 font-medium">Total de Turnos</span>
+          <span class="text-xs text-slate-400 font-medium">Turnos no Período</span>
           <h3 id="kpiTurnos" class="text-2xl font-bold text-slate-100">0</h3>
         </div>
       </div>
@@ -76,19 +105,21 @@
       </div>
     </div>
 
-    <!-- Filtros e Tabela -->
+    <!-- Resumo por Segurança no Período -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+      <h2 class="text-base font-semibold text-slate-200 mb-4">Total de Horas no Período por Segurança</h2>
+      <div id="cardsSegurancas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- Preenchido via JS -->
+      </div>
+    </div>
+
+    <!-- Tabela de Turnos -->
     <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm">
-      <div class="p-5 border-b border-slate-700 flex flex-wrap gap-4 items-center justify-between">
-        <h2 class="text-lg font-semibold text-slate-200">Histórico de Turnos</h2>
-        
-        <div class="flex items-center gap-3 flex-wrap">
-          <input type="text" id="filtroNome" placeholder="Filtrar por nome..." oninput="carregarTurnos()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
-          <input type="date" id="filtroDataInicio" onchange="carregarTurnos()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
-          <button onclick="limparFiltros()" class="text-xs text-slate-400 hover:text-slate-200 underline">Limpar</button>
-        </div>
+      <div class="p-5 border-b border-slate-700 flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-slate-200">Histórico Detalhado de Turnos</h2>
+        <span id="totalRegistrosBadge" class="text-xs bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-slate-400">0 registros</span>
       </div>
 
-      <!-- Tabela -->
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-sm">
           <thead>
@@ -103,31 +134,37 @@
           </thead>
           <tbody id="tabelaCorpo" class="divide-y divide-slate-700 text-slate-300">
             <tr>
-              <td colspan="6" class="py-8 text-center text-slate-500">Nenhum registro carregado ainda.</td>
+              <td colspan="6" class="py-8 text-center text-slate-500">Nenhum registro encontrado.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Resumo por Segurança -->
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-      <h2 class="text-base font-semibold text-slate-200 mb-4">Total de Horas por Segurança</h2>
-      <div id="cardsSegurancas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <!-- Preenchido via JS -->
-      </div>
-    </div>
-
   </main>
 
   <script>
+    function obterParametrosFiltro() {
+      const nome = document.getElementById('filtroNome').value.trim();
+      const dataInicio = document.getElementById('filtroDataInicio').value;
+      const dataFim = document.getElementById('filtroDataFim').value;
+      
+      let params = new URLSearchParams();
+      if (nome) params.append("seguranca", nome);
+      if (dataInicio) params.append("data_inicio", dataInicio);
+      if (dataFim) params.append("data_fim", dataFim);
+      
+      return params.toString();
+    }
+
     async function carregarDados() {
       await Promise.all([carregarTurnos(), carregarResumo()]);
     }
 
     async function carregarResumo() {
+      const q = obterParametrosFiltro();
       try {
-        const res = await fetch('/api/resumo');
+        const res = await fetch('/api/resumo?' + q);
         const data = await res.json();
         
         document.getElementById('kpiHoras').innerText = (data.geral.total_horas || 0) + 'h';
@@ -136,6 +173,11 @@
 
         const container = document.getElementById('cardsSegurancas');
         container.innerHTML = '';
+        if (data.por_seguranca.length === 0) {
+          container.innerHTML = '<div class="text-sm text-slate-500 col-span-4">Nenhum registro para o período selecionado.</div>';
+          return;
+        }
+
         data.por_seguranca.forEach(s => {
           container.innerHTML += `
             <div class="bg-slate-900/80 border border-slate-700/80 rounded-lg p-4">
@@ -151,30 +193,28 @@
     }
 
     async function carregarTurnos() {
-      const nome = document.getElementById('filtroNome').value;
-      const dataInicio = document.getElementById('filtroDataInicio').value;
-      
-      let url = '/api/turnos?';
-      if (nome) url += `seguranca=${encodeURIComponent(nome)}&`;
-      if (dataInicio) url += `data_inicio=${encodeURIComponent(dataInicio)}&`;
-
+      const q = obterParametrosFiltro();
       try {
-        const res = await fetch(url);
+        const res = await fetch('/api/turnos?' + q);
         const turnos = await res.json();
         const tbody = document.getElementById('tabelaCorpo');
+        const badge = document.getElementById('totalRegistrosBadge');
         tbody.innerHTML = '';
+        badge.innerText = turnos.length + ' registros';
 
         if (turnos.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500">Nenhum turno encontrado.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500">Nenhum turno encontrado com os filtros atuais.</td></tr>`;
           return;
         }
 
         turnos.forEach(t => {
           let badgeStatus = 'bg-slate-700 text-slate-300';
           if (t.status === 'Concluído') badgeStatus = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+          else if (t.status.includes('Parcial') || t.status.includes('Almoço')) badgeStatus = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
+          else if (t.status.includes('fotográfico')) badgeStatus = 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
           else if (t.status.includes('Atenção') || t.status.includes('Sem')) badgeStatus = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
 
-          const veiculo = [t.veiculo_tipo, t.veiculo_cor].filter(Boolean).join(' ') || 'Não especificado';
+          const veiculo = [t.veiculo_tipo, t.veiculo_cor].filter(Boolean).join(' ') || 'Não informado';
           const inicioFormatado = t.data_inicio_br || t.data_inicio;
           const fimFormatado = t.data_fim_br || t.data_fim || '-';
 
@@ -235,18 +275,15 @@
     }
 
     function exportarExcel() {
-      const nome = document.getElementById('filtroNome').value;
-      const dataInicio = document.getElementById('filtroDataInicio').value;
-      let url = '/api/exportar?';
-      if (nome) url += `seguranca=${encodeURIComponent(nome)}&`;
-      if (dataInicio) url += `data_inicio=${encodeURIComponent(dataInicio)}&`;
-      window.location.href = url;
+      const q = obterParametrosFiltro();
+      window.location.href = '/api/exportar?' + q;
     }
 
     function limparFiltros() {
       document.getElementById('filtroNome').value = '';
       document.getElementById('filtroDataInicio').value = '';
-      carregarTurnos();
+      document.getElementById('filtroDataFim').value = '';
+      carregarDados();
     }
 
     window.onload = carregarDados;

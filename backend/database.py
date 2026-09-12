@@ -5,7 +5,6 @@ from typing import List, Dict, Any, Optional
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "rondas.db"))
 
 def get_db():
-    # Garante que a pasta pai exista (ex: /app/data)
     os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -81,7 +80,7 @@ def listar_turnos(seguranca: Optional[str] = None, data_inicio: Optional[str] = 
         params.append(f"%{seguranca}%")
     if data_inicio:
         query += " AND data_inicio >= ?"
-        params.append(data_inicio)
+        params.append(data_inicio + " 00:00:00")
     if data_fim:
         query += " AND data_inicio <= ?"
         params.append(data_fim + " 23:59:59")
@@ -92,24 +91,37 @@ def listar_turnos(seguranca: Optional[str] = None, data_inicio: Optional[str] = 
     conn.close()
     return [dict(row) for row in rows]
 
-def obter_resumo() -> Dict[str, Any]:
+def obter_resumo(seguranca: Optional[str] = None, data_inicio: Optional[str] = None, data_fim: Optional[str] = None) -> Dict[str, Any]:
     conn = get_db()
     cursor = conn.cursor()
     
-    cursor.execute("""
+    where = "WHERE 1=1"
+    params = []
+    
+    if seguranca:
+        where += " AND seguranca LIKE ?"
+        params.append(f"%{seguranca}%")
+    if data_inicio:
+        where += " AND data_inicio >= ?"
+        params.append(data_inicio + " 00:00:00")
+    if data_fim:
+        where += " AND data_inicio <= ?"
+        params.append(data_fim + " 23:59:59")
+    
+    cursor.execute(f"""
     SELECT 
         seguranca,
         COUNT(*) as total_turnos,
         ROUND(SUM(horas_trabalhadas), 2) as total_horas,
         ROUND(AVG(horas_trabalhadas), 2) as media_horas
     FROM turnos
-    WHERE horas_trabalhadas IS NOT NULL
+    {where} AND horas_trabalhadas IS NOT NULL
     GROUP BY seguranca
     ORDER BY total_horas DESC
-    """)
+    """, params)
     resumo_segurancas = [dict(r) for r in cursor.fetchall()]
     
-    cursor.execute("SELECT COUNT(*) as total_turnos, ROUND(SUM(horas_trabalhadas), 2) as total_horas FROM turnos")
+    cursor.execute(f"SELECT COUNT(*) as total_turnos, ROUND(SUM(horas_trabalhadas), 2) as total_horas FROM turnos {where}", params)
     geral = dict(cursor.fetchone() or {"total_turnos": 0, "total_horas": 0})
     
     conn.close()

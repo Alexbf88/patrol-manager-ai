@@ -29,7 +29,6 @@ def formatar_data_br(data_iso_str: Optional[str]) -> str:
     if not data_iso_str:
         return "-"
     try:
-        # Ex: "2026-06-01 07:02" -> "01/06/2026 07:02"
         dt = datetime.strptime(data_iso_str, "%Y-%m-%d %H:%M")
         return dt.strftime("%d/%m/%Y %H:%M")
     except Exception:
@@ -64,15 +63,18 @@ def get_turnos(
     data_fim: Optional[str] = Query(None)
 ):
     turnos = listar_turnos(seguranca=seguranca, data_inicio=data_inicio, data_fim=data_fim)
-    # Formata datas para o padrao brasileiro na resposta da API
     for t in turnos:
         t["data_inicio_br"] = formatar_data_br(t.get("data_inicio"))
         t["data_fim_br"] = formatar_data_br(t.get("data_fim"))
     return turnos
 
 @app.get("/api/resumo")
-def get_resumo():
-    return obter_resumo()
+def get_resumo(
+    seguranca: Optional[str] = Query(None),
+    data_inicio: Optional[str] = Query(None),
+    data_fim: Optional[str] = Query(None)
+):
+    return obter_resumo(seguranca=seguranca, data_inicio=data_inicio, data_fim=data_fim)
 
 @app.get("/api/exportar")
 def exportar_excel(
@@ -84,7 +86,6 @@ def exportar_excel(
     if not turnos:
         raise HTTPException(status_code=404, detail="Nenhum dado encontrado para exportar.")
         
-    # Formata para padrao BR na planilha
     for t in turnos:
         t["data_inicio"] = formatar_data_br(t.get("data_inicio"))
         t["data_fim"] = formatar_data_br(t.get("data_fim"))
