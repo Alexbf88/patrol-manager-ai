@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import pandas as pd
+from datetime import datetime
 from typing import Optional
 
 from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo
@@ -12,7 +13,6 @@ from backend.parser import processar_chat_whatsapp
 
 app = FastAPI(title="Ronda Segurança API", version="1.0.0")
 
-# Permitir CORS caso use frontend separado
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,6 +24,16 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+
+def formatar_data_br(data_iso_str: Optional[str]) -> str:
+    if not data_iso_str:
+        return "-"
+    try:
+        # Ex: "2026-06-01 07:02" -> "01/06/2026 07:02"
+        dt = datetime.strptime(data_iso_str, "%Y-%m-%d %H:%M")
+        return dt.strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return data_iso_str
 
 @app.post("/api/upload")
 async def upload_chat(file: UploadFile = File(...)):
@@ -53,7 +63,12 @@ def get_turnos(
     data_inicio: Optional[str] = Query(None),
     data_fim: Optional[str] = Query(None)
 ):
-    return listar_turnos(seguranca=seguranca, data_inicio=data_inicio, data_fim=data_fim)
+    turnos = listar_turnos(seguranca=seguranca, data_inicio=data_inicio, data_fim=data_fim)
+    # Formata datas para o padrao brasileiro na resposta da API
+    for t in turnos:
+        t["data_inicio_br"] = formatar_data_br(t.get("data_inicio"))
+        t["data_fim_br"] = formatar_data_br(t.get("data_fim"))
+    return turnos
 
 @app.get("/api/resumo")
 def get_resumo():
@@ -69,6 +84,11 @@ def exportar_excel(
     if not turnos:
         raise HTTPException(status_code=404, detail="Nenhum dado encontrado para exportar.")
         
+    # Formata para padrao BR na planilha
+    for t in turnos:
+        t["data_inicio"] = formatar_data_br(t.get("data_inicio"))
+        t["data_fim"] = formatar_data_br(t.get("data_fim"))
+
     df = pd.DataFrame(turnos)
     
     colunas_renomeadas = {
@@ -77,15 +97,14 @@ def exportar_excel(
         "telefone_origem": "Telefone / Contato",
         "veiculo_tipo": "Tipo Veículo",
         "veiculo_cor": "Cor Veículo",
-        "data_inicio": "Início Turno",
-        "data_fim": "Fim Turno",
+        "data_inicio": "Início Turno (DD/MM/AAAA HH:MM)",
+        "data_fim": "Fim Turno (DD/MM/AAAA HH:MM)",
         "horas_trabalhadas": "Horas Trabalhadas",
         "status": "Status",
         "detalhes": "Mensagens Originais"
     }
     df = df.rename(columns=colunas_renomeadas)
     
-    # Remover colunas internas se existirem
     if "created_at" in df.columns:
         df = df.drop(columns=["created_at"])
         
@@ -95,7 +114,7 @@ def exportar_excel(
     output.seek(0)
     
     headers = {
-        "Content-Disposition": "attachment; filename=relatorio_rondas.xlsx"
+        "Content-Disposition": "attachment; filename=relatorio_rondas_br.xlsx"
     }
     return StreamingResponse(
         output,
@@ -103,7 +122,6 @@ def exportar_excel(
         headers=headers
     )
 
-# Servir Frontend
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")

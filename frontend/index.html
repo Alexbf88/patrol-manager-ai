@@ -21,7 +21,7 @@
       </div>
       <div class="flex gap-3">
         <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 text-sm transition shadow-lg shadow-emerald-900/30">
-          <i class="fa-solid fa-file-excel"></i> Baixar Planilha
+          <i class="fa-solid fa-file-excel"></i> Baixar Planilha (.xlsx)
         </button>
       </div>
     </div>
@@ -95,8 +95,8 @@
             <tr class="bg-slate-900/60 text-slate-400 border-b border-slate-700 text-xs font-semibold uppercase tracking-wider">
               <th class="py-3.5 px-4">Segurança</th>
               <th class="py-3.5 px-4">Veículo</th>
-              <th class="py-3.5 px-4">Início</th>
-              <th class="py-3.5 px-4">Fim</th>
+              <th class="py-3.5 px-4">Início (DD/MM/AAAA)</th>
+              <th class="py-3.5 px-4">Fim (DD/MM/AAAA)</th>
               <th class="py-3.5 px-4">Horas</th>
               <th class="py-3.5 px-4">Status</th>
             </tr>
@@ -175,13 +175,15 @@
           else if (t.status.includes('Atenção') || t.status.includes('Sem')) badgeStatus = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
 
           const veiculo = [t.veiculo_tipo, t.veiculo_cor].filter(Boolean).join(' ') || 'Não especificado';
+          const inicioFormatado = t.data_inicio_br || t.data_inicio;
+          const fimFormatado = t.data_fim_br || t.data_fim || '-';
 
           tbody.innerHTML += `
             <tr class="hover:bg-slate-700/30 transition">
               <td class="py-3 px-4 font-medium text-slate-200">${t.seguranca}</td>
               <td class="py-3 px-4 text-slate-400">${veiculo}</td>
-              <td class="py-3 px-4">${t.data_inicio}</td>
-              <td class="py-3 px-4">${t.data_fim || '-'}</td>
+              <td class="py-3 px-4">${inicioFormatado}</td>
+              <td class="py-3 px-4">${fimFormatado}</td>
               <td class="py-3 px-4 font-semibold text-emerald-400">${t.horas_trabalhadas ? t.horas_trabalhadas + 'h' : '-'}</td>
               <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${badgeStatus}">${t.status}</span></td>
             </tr>
