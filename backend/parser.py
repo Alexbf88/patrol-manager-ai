@@ -6,8 +6,12 @@ MSG_PATTERN = re.compile(
     r"^(\d{1,2}/\d{1,2}/\d{2,4}),?\s+(\d{1,2}:\d{2})\s*-\s*([^:]+):\s*(.*)$"
 )
 
-# Mapeamento rigoroso e prioritário por NÚMERO / CONTATO
-# Alexandre Santos: 11999990001 / contato 'Alexandre Santos'
+# Mapeamento estrito da EQUIPE OFICIAL DE SEGURANÇAS:
+# - Marcos Silva (+55 11 99999-0001)
+# - Carlos Oliveira (+55 11 99999-0002)
+# - Alexandre Santos (+55 11 99999-0003 / Alexandre Santos)
+# - Eduardo Lima (Eduardo Lima / Eduardo Lima)
+# - Lucas Ferreira (+55 15 99999-0004)
 MAPA_CONTATOS = {
     "+55 11 99999-0001": "Marcos Silva",
     "+55 11 99999-0002": "Carlos Oliveira",
@@ -15,10 +19,8 @@ MAPA_CONTATOS = {
     "+55 11 999990001": "Alexandre Santos",
     "Alexandre Santos": "Alexandre Santos",
     "+55 15 99999-0004": "Lucas Ferreira",
-    "+55 11 99999-0005": "Apoio Operacional",
     "Eduardo Lima": "Eduardo Lima",
-    "Eduardo Lima": "Eduardo Lima",
-    "Servicos Gerais - Terceirizado": "Servicos Gerais"
+    "Eduardo Lima": "Eduardo Lima"
 }
 
 def parse_data_hora(data_str: str, hora_str: str) -> Optional[datetime]:
@@ -64,7 +66,7 @@ def extrair_veiculo(texto: str):
 def identificar_seguranca(remetente: str, texto: str) -> Optional[str]:
     rem = remetente.strip()
     
-    # 1. Prioridade absoluta por contato/número
+    # 1. Prioridade absoluta por contato/número da equipe oficial
     if rem in MAPA_CONTATOS:
         return MAPA_CONTATOS[rem]
     for tel, nome in MAPA_CONTATOS.items():
@@ -84,10 +86,6 @@ def identificar_seguranca(remetente: str, texto: str) -> Optional[str]:
         return "Eduardo Lima"
     elif "lucas ferreira" in texto_lower:
         return "Lucas Ferreira"
-    elif "apoio operacional" in texto_lower or "apoio" in texto_lower:
-        return "Apoio Operacional"
-    elif "servicos gerais" in texto_lower:
-        return "Servicos Gerais"
         
     return None
 
@@ -152,16 +150,12 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
 
     turnos_finais = []
     
-    # Agrupa por segurança
     msgs_por_seg = {}
     for m in mensagens_chat:
         msgs_por_seg.setdefault(m["seguranca"], []).append(m)
 
     for seg, msgs in msgs_por_seg.items():
-        # Para Alexandre Santos, Carlos Oliveira e Lucas Ferreira:
-        # Freqüentemente realizam o serviço enviando as fotos das rondas ao longo do turno,
-        # sem mandar "iniciando" e "encerrando" formal todo dia.
-        # Agrupamos por blocos contínuos de ronda (intervalo <= 4 horas entre fotos/mensagens)
+        # Para Alexandre Santos, Carlos Oliveira e Lucas Ferreira (rondas contínuas por fotos/relatos)
         if seg in ["Alexandre Santos", "Carlos Oliveira", "Lucas Ferreira"]:
             blocos = []
             bloco_atual = []
@@ -171,13 +165,11 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     bloco_atual.append(m)
                 else:
                     diff_horas = (m["datetime"] - bloco_atual[-1]["datetime"]).total_seconds() / 3600
-                    # Se mandou "iniciando" explicitamente, força início de novo bloco
                     if m["tipo_evento"] == "INICIO" and bloco_atual:
                         blocos.append(bloco_atual)
                         bloco_atual = [m]
                     elif diff_horas <= 4.0:
                         bloco_atual.append(m)
-                        # Se mandou "encerrando", fecha o bloco aqui
                         if m["tipo_evento"] == "FIM":
                             blocos.append(bloco_atual)
                             bloco_atual = []
@@ -193,7 +185,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                 diff = dt_fim - dt_ini
                 horas = round(diff.total_seconds() / 3600, 2)
                 
-                # Se postou apenas 1 mensagem avulsa
                 if horas == 0:
                     horas = 0.5
                     
@@ -203,7 +194,6 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     if t and not v_t: v_t = t
                     if c and not v_c: v_c = c
                     
-                # Se Alexandre Santos tiver veiculo padrão histórico (ex moto)
                 if seg == "Alexandre Santos" and not v_t:
                     v_t = "Moto"
                     
@@ -226,7 +216,7 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                 })
             continue
 
-        # Para quem declara INICIO / FIM / PARCIAL formalmente (Marcos Silva, Eduardo Lima, Servicos Gerais, Apoio)
+        # Para quem declara INICIO / FIM / PARCIAL formalmente (Marcos Silva, Eduardo Lima)
         turno_aberto = None
         ultima_msg_ativa = None
         
