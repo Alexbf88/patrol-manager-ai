@@ -2,9 +2,11 @@ import sqlite3
 import os
 from typing import List, Dict, Any, Optional
 
-DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "rondas.db"))
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "rondas.db"))
 
 def get_db():
+    # Garante que a pasta pai exista (ex: /app/data)
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
