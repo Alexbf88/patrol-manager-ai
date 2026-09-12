@@ -45,7 +45,7 @@
       </div>
     </div>
 
-    <!-- Barra de Filtros Global (impacta KPIs, Resumo e Tabela) -->
+    <!-- Barra de Filtros Global -->
     <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -113,6 +113,14 @@
       </div>
     </div>
 
+    <!-- Legenda de Cores para Auditoria -->
+    <div class="flex items-center gap-4 text-xs text-slate-400 px-1">
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500"></span> Concluído formal</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500"></span> Estimado por última foto/atividade (Atenção)</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-indigo-500/20 border border-indigo-500"></span> Ronda fotográfica contínua</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-cyan-500/20 border border-cyan-500"></span> Ajustado Manualmente</span>
+    </div>
+
     <!-- Tabela de Turnos -->
     <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm">
       <div class="p-5 border-b border-slate-700 flex items-center justify-between">
@@ -130,11 +138,12 @@
               <th class="py-3.5 px-4">Fim (DD/MM/AAAA)</th>
               <th class="py-3.5 px-4">Duração</th>
               <th class="py-3.5 px-4">Status</th>
+              <th class="py-3.5 px-4 text-center">Ações</th>
             </tr>
           </thead>
           <tbody id="tabelaCorpo" class="divide-y divide-slate-700 text-slate-300">
             <tr>
-              <td colspan="6" class="py-8 text-center text-slate-500">Nenhum registro encontrado.</td>
+              <td colspan="7" class="py-8 text-center text-slate-500">Nenhum registro encontrado.</td>
             </tr>
           </tbody>
         </table>
@@ -143,7 +152,53 @@
 
   </main>
 
+  <!-- Modal de Edição Manual de Turno -->
+  <div id="modalEdicao" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> Ajustar Horário do Turno
+        </h3>
+        <button onclick="fecharModal()" class="text-slate-400 hover:text-slate-200"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      
+      <p class="text-xs text-slate-400">
+        Ajuste os horários reais caso a mensagem de encerramento tenha sido enviada com atraso pelo segurança.
+      </p>
+
+      <input type="hidden" id="editTurnoId">
+      
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Segurança</label>
+        <input type="text" id="editSeguranca" disabled class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-400">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Início (AAAA-MM-DD HH:MM)</label>
+          <input type="text" id="editDataInicio" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Fim (AAAA-MM-DD HH:MM)</label>
+          <input type="text" id="editDataFim" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 font-mono">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-slate-300 mb-1">Motivo / Observação do Ajuste</label>
+        <input type="text" id="editDetalhes" placeholder="Ex: Informou no texto que encerrou às 16:45" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="fecharModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">Cancelar</button>
+        <button onclick="salvarAjusteManual()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition shadow-lg shadow-indigo-900/30">Salvar Ajuste</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    let turnosEmMemoria = [];
+
     function formatarHM(horasDec) {
       if (horasDec === null || horasDec === undefined || horasDec < 0) return "-";
       const totalMin = Math.round(horasDec * 60);
@@ -210,22 +265,33 @@
       try {
         const res = await fetch('/api/turnos?' + q);
         const turnos = await res.json();
+        turnosEmMemoria = turnos;
         const tbody = document.getElementById('tabelaCorpo');
         const badge = document.getElementById('totalRegistrosBadge');
         tbody.innerHTML = '';
         badge.innerText = turnos.length + ' registros';
 
         if (turnos.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500">Nenhum turno encontrado com os filtros atuais.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500">Nenhum turno encontrado com os filtros atuais.</td></tr>`;
           return;
         }
 
         turnos.forEach(t => {
           let badgeStatus = 'bg-slate-700 text-slate-300';
-          if (t.status === 'Concluído') badgeStatus = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-          else if (t.status.includes('Parcial') || t.status.includes('Almoço')) badgeStatus = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
-          else if (t.status.includes('fotográfico')) badgeStatus = 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
-          else if (t.status.includes('Atenção') || t.status.includes('Sem')) badgeStatus = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+          let rowHighlight = '';
+
+          if (t.status === 'Concluído') {
+            badgeStatus = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+          } else if (t.status.includes('Ajustado')) {
+            badgeStatus = 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+            rowHighlight = 'bg-cyan-950/10';
+          } else if (t.status.includes('atividade') || t.status.includes('Sem') || t.status.includes('Atenção')) {
+            // DESTAQUE EM AMARELO/ÂMBAR PARA CHAMAR ATENÇÃO DO GESTOR
+            badgeStatus = 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold';
+            rowHighlight = 'bg-amber-950/20 hover:bg-amber-950/30';
+          } else if (t.status.includes('fotográfico')) {
+            badgeStatus = 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
+          }
 
           const veiculo = [t.veiculo_tipo, t.veiculo_cor].filter(Boolean).join(' ') || 'Não informado';
           const inicioFormatado = t.data_inicio_br || t.data_inicio;
@@ -233,18 +299,74 @@
           const duracao = t.horas_formatadas || formatarHM(t.horas_trabalhadas);
 
           tbody.innerHTML += `
-            <tr class="hover:bg-slate-700/30 transition">
-              <td class="py-3 px-4 font-medium text-slate-200">${t.seguranca}</td>
+            <tr class="${rowHighlight} hover:bg-slate-700/30 transition border-b border-slate-700/60">
+              <td class="py-3 px-4 font-medium text-slate-200 flex items-center gap-2">
+                ${t.status.includes('atividade') ? '<i class="fa-solid fa-triangle-exclamation text-amber-400 text-xs" title="Horário de fim estimado por foto (sem mensagem formal de encerramento)"></i>' : ''}
+                ${t.seguranca}
+              </td>
               <td class="py-3 px-4 text-slate-400">${veiculo}</td>
-              <td class="py-3 px-4">${inicioFormatado}</td>
-              <td class="py-3 px-4">${fimFormatado}</td>
+              <td class="py-3 px-4 font-mono text-xs">${inicioFormatado}</td>
+              <td class="py-3 px-4 font-mono text-xs">${fimFormatado}</td>
               <td class="py-3 px-4 font-semibold text-emerald-400">${duracao}</td>
-              <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${badgeStatus}">${t.status}</span></td>
+              <td class="py-3 px-4">
+                <span class="px-2.5 py-1 rounded-full text-xs font-medium ${badgeStatus}">${t.status}</span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <button onclick="abrirModalEdicao(${t.id})" class="text-xs bg-slate-700/80 hover:bg-indigo-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg transition" title="Ajustar horário manualmente">
+                  <i class="fa-solid fa-pen-to-square"></i> Ajustar
+                </button>
+              </td>
             </tr>
           `;
         });
       } catch (e) {
         console.error("Erro ao carregar turnos", e);
+      }
+    }
+
+    function abrirModalEdicao(turnoId) {
+      const t = turnosEmMemoria.find(x => x.id === turnoId);
+      if (!t) return;
+
+      document.getElementById('editTurnoId').value = t.id;
+      document.getElementById('editSeguranca').value = t.seguranca;
+      document.getElementById('editDataInicio').value = t.data_inicio;
+      document.getElementById('editDataFim').value = t.data_fim || t.data_inicio;
+      document.getElementById('editDetalhes').value = t.detalhes || '';
+      
+      document.getElementById('modalEdicao').classList.remove('hidden');
+    }
+
+    function fecharModal() {
+      document.getElementById('modalEdicao').classList.add('hidden');
+    }
+
+    async function salvarAjusteManual() {
+      const id = document.getElementById('editTurnoId').value;
+      const dataInicio = document.getElementById('editDataInicio').value.trim();
+      const dataFim = document.getElementById('editDataFim').value.trim();
+      const detalhes = document.getElementById('editDetalhes').value.trim();
+
+      try {
+        const res = await fetch(`/api/turnos/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            detalhes: detalhes || 'Ajuste manual pelo gestor',
+            status: 'Ajustado Manualmente'
+          })
+        });
+        if (res.ok) {
+          fecharModal();
+          await carregarDados();
+        } else {
+          const err = await res.json();
+          alert("Erro ao salvar: " + (err.detail || "Verifique o formato das datas"));
+        }
+      } catch (e) {
+        alert("Erro na requisição: " + e);
       }
     }
 

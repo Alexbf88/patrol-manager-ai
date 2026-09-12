@@ -1,14 +1,14 @@
 import os
 import io
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import pandas as pd
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 
-from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo
+from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno
 from backend.parser import processar_chat_whatsapp
 
 app = FastAPI(title="Ronda Segurança API", version="1.0.0")
@@ -81,6 +81,32 @@ def get_turnos(
         t["data_fim_br"] = formatar_data_br(t.get("data_fim"))
         t["horas_formatadas"] = formatar_horas_hm(t.get("horas_trabalhadas"))
     return turnos
+
+@app.put("/api/turnos/{turno_id}")
+def put_turno(turno_id: int, payload: Dict[str, Any] = Body(...)):
+    # Permite ajuste manual de horário pelo gestor
+    data_inicio = payload.get("data_inicio")
+    data_fim = payload.get("data_fim")
+    detalhes = payload.get("detalhes", "Ajuste manual pelo gestor")
+    
+    if not data_inicio:
+        raise HTTPException(status_code=400, detail="data_inicio é obrigatória.")
+        
+    horas = None
+    if data_fim:
+        try:
+            dt_i = datetime.strptime(data_inicio, "%Y-%m-%d %H:%M")
+            dt_f = datetime.strptime(data_fim, "%Y-%m-%d %H:%M")
+            horas = round((dt_f - dt_i).total_seconds() / 3600, 2)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Formato de data inválido: {e}")
+            
+    status = payload.get("status", "Ajustado Manualmente")
+    sucesso = atualizar_turno(turno_id, data_inicio, data_fim, horas, status, detalhes)
+    if not sucesso:
+        raise HTTPException(status_code=404, detail="Turno não encontrado.")
+        
+    return {"mensagem": "Turno atualizado com sucesso!", "horas_trabalhadas": horas, "horas_formatadas": formatar_horas_hm(horas)}
 
 @app.get("/api/resumo")
 def get_resumo(

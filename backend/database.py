@@ -129,3 +129,20 @@ def obter_resumo(seguranca: Optional[str] = None, data_inicio: Optional[str] = N
         "geral": geral,
         "por_seguranca": resumo_segurancas
     }
+
+def atualizar_turno(turno_id: int, data_inicio: str, data_fim: Optional[str], horas: Optional[float], status: str, detalhes: Optional[str]):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE turnos SET
+        data_inicio = ?,
+        data_fim = ?,
+        horas_trabalhadas = ?,
+        status = ?,
+        detalhes = ?
+    WHERE id = ?
+    """, (data_inicio, data_fim, horas, status, detalhes, turno_id))
+    afetados = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return afetados > 0
