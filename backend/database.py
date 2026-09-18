@@ -32,6 +32,15 @@ def init_db():
     conn.commit()
     conn.close()
 
+def purgar_turnos() -> int:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM turnos")
+    removidos = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return removidos
+
 def salvar_turnos(turnos: List[Dict[str, Any]]) -> int:
     conn = get_db()
     cursor = conn.cursor()

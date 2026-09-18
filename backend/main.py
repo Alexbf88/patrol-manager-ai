@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno
+from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno, purgar_turnos
 from backend.parser import processar_chat_whatsapp
 
 app = FastAPI(title="Ronda Segurança API", version="1.0.0")
@@ -68,6 +68,11 @@ async def upload_chat(file: UploadFile = File(...)):
         "mensagem": f"{len(turnos)} turnos processados com sucesso!",
         "total_registrados": total_salvos
     }
+
+@app.post("/api/purgar")
+def post_purgar():
+    removidos = purgar_turnos()
+    return {"mensagem": f"Base de dados purgada com sucesso! {removidos} turnos removidos.", "removidos": removidos}
 
 @app.get("/api/turnos")
 def get_turnos(

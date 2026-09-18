@@ -38,8 +38,11 @@
       
       <div class="flex items-center gap-4 flex-wrap">
         <input type="file" id="arquivoTxt" accept=".txt,.log" class="text-sm text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer">
-        <button id="btnUpload" onclick="fazerUpload()" class="bg-slate-700 hover:bg-slate-600 text-slate-100 font-medium py-2.5 px-5 rounded-lg text-sm transition">
+        <button id="btnUpload" onclick="fazerUpload()" class="bg-indigo-600 hover:bg-indigo-500 text-slate-100 font-medium py-2.5 px-5 rounded-lg text-sm transition">
           Processar e Salvar
+        </button>
+        <button id="btnPurgar" onclick="purgarBase()" class="bg-rose-700/80 hover:bg-rose-600 text-slate-100 font-medium py-2.5 px-4 rounded-lg text-sm transition flex items-center gap-1.5" title="Limpar todos os dados do banco">
+          <i class="fa-solid fa-trash-can"></i> Purgar Banco
         </button>
         <span id="uploadStatus" class="text-sm font-medium"></span>
       </div>
@@ -407,6 +410,31 @@
         status.className = "text-sm text-rose-400 font-medium";
       } finally {
         btn.disabled = false;
+      }
+    }
+
+    async function purgarBase() {
+      if (!confirm("Tem certeza que deseja purgar (apagar) todos os registros do banco de dados?")) {
+        return;
+      }
+      const status = document.getElementById('uploadStatus');
+      status.innerText = "Purgando base de dados...";
+      status.className = "text-sm text-amber-400 font-medium";
+
+      try {
+        const res = await fetch('/api/purgar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          status.innerText = data.mensagem;
+          status.className = "text-sm text-emerald-400 font-medium";
+          await carregarDados();
+        } else {
+          status.innerText = data.detail || "Erro ao purgar base.";
+          status.className = "text-sm text-rose-400 font-medium";
+        }
+      } catch (e) {
+        status.innerText = "Falha de comunicação com o servidor.";
+        status.className = "text-sm text-rose-400 font-medium";
       }
     }
 

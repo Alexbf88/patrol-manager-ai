@@ -89,32 +89,42 @@ def identificar_seguranca(remetente: str) -> Optional[str]:
 
 def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
     linhas = conteudo_texto.splitlines()
-    mensagens_chat = []
     dt_min = datetime.strptime(data_minima, "%Y-%m-%d") if data_minima else None
 
+    # 1. Agrupar mensagens preservando legendas de fotos e quebras de linha
+    mensagens_brutas = []
     for linha in linhas:
-        linha = linha.strip()
-        if not linha:
+        if not linha.strip():
             continue
-            
-        m = MSG_PATTERN.match(linha)
-        if not m:
-            continue
-            
-        data_str, hora_str, remetente, mensagem = m.groups()
-        dt = parse_data_hora(data_str, hora_str)
+        m = MSG_PATTERN.match(linha.strip())
+        if m:
+            data_str, hora_str, remetente, mensagem = m.groups()
+            mensagens_brutas.append({
+                "data_str": data_str,
+                "hora_str": hora_str,
+                "remetente": remetente.strip(),
+                "mensagem": mensagem.strip()
+            })
+        else:
+            # É a legenda da foto ou continuação da mensagem anterior!
+            if mensagens_brutas:
+                mensagens_brutas[-1]["mensagem"] += " " + linha.strip()
+
+    mensagens_chat = []
+    for mb in mensagens_brutas:
+        dt = parse_data_hora(mb["data_str"], mb["hora_str"])
         if not dt:
             continue
             
         if dt_min and dt < dt_min:
             continue
 
-        rem_limpo = remetente.strip()
-        # Identificação estritamente pelo REMETENTE
+        rem_limpo = mb["remetente"]
         seguranca = identificar_seguranca(rem_limpo)
         if not seguranca:
             continue
 
+        mensagem = mb["mensagem"]
         msg_lower = mensagem.lower()
         tipo_evento = None
         
