@@ -9,11 +9,16 @@ MSG_PATTERN = re.compile(
 # Mapeamento estrito da EQUIPE OFICIAL DE SEGURANÇAS:
 MAPA_CONTATOS = {
     "+55 11 99999-0001": "Marcos Silva",
+    "Marcos Silva": "Marcos Silva",
     "+55 11 99999-0002": "Carlos Oliveira",
+    "Carlos Oliveira": "Carlos Oliveira",
+    "Carlos Oliveira": "Carlos Oliveira",
     "+55 11 99999-0003": "Alexandre Santos",
     "+55 11 999990001": "Alexandre Santos",
     "Alexandre Santos": "Alexandre Santos",
     "+55 15 99999-0004": "Lucas Ferreira",
+    "Lucas Ferreira": "Lucas Ferreira",
+    "Lucas Ferreira": "Lucas Ferreira",
     "Eduardo Lima": "Eduardo Lima",
     "Eduardo Lima": "Eduardo Lima"
 }

@@ -1,12 +1,27 @@
+# Python & Environments
 venv/
 .env
 __pycache__/
 *.py[cod]
+
+# Databases & Runtime State (Keep repository clean of sensitive real data)
 *.sqlite
+*.sqlite3
 *.db
 rondas.db
-.DS_Store
-*.xlsx
-uploads/
 data/
+uploads/
 
+# Generated Reports & Spreadsheets
+*.xlsx
+
+# Sensitive Raw WhatsApp Chat Exports
+*.log
+*.txt
+!samples/sample_chat.txt
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
