@@ -48,108 +48,271 @@
       </div>
     </div>
 
-    <!-- Barra de Filtros Global -->
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
-            <i class="fa-solid fa-filter text-indigo-400"></i> Filtros de Período e Segurança
-          </h2>
-          <p class="text-xs text-slate-400">Selecione o intervalo de datas ou segurança para recalcular as horas e a tabela.</p>
+    <!-- Seletor de Abas Principal -->
+    <div class="flex items-center justify-between border-b border-slate-700 pb-3 flex-wrap gap-4">
+      <div class="flex items-center gap-3">
+        <button id="tabBtnTurnos" onclick="alternarAba('turnos')" class="px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2.5 bg-indigo-600 text-white shadow-lg shadow-indigo-900/40">
+          <i class="fa-solid fa-business-time text-base"></i> Livro de Turnos & Horas
+        </button>
+        <button id="tabBtnOcorrencias" onclick="alternarAba('ocorrencias')" class="px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700">
+          <i class="fa-solid fa-shield-halved text-amber-400 text-base"></i> 
+          <span>Livro de Ocorrências Digital</span>
+          <span id="badgeQtdOcorrencias" class="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold">0</span>
+        </button>
+      </div>
+
+      <!-- Ações da aba ativa -->
+      <div id="acoesTurnos" class="flex items-center gap-2">
+        <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 text-xs transition shadow-md">
+          <i class="fa-solid fa-file-excel"></i> Exportar Turnos (.xlsx)
+        </button>
+      </div>
+      <div id="acoesOcorrencias" class="hidden flex items-center gap-2">
+        <button id="btnExtrairOcorrencias" onclick="extrairOcorrenciasComIA()" class="bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 text-xs transition shadow-lg shadow-purple-900/30" title="Executa o Llama 3.1 no host para extrair ocorrências do histórico">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Extrair Ocorrências com IA</span>
+        </button>
+        <button onclick="exportarOcorrenciasExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 text-xs transition shadow-md">
+          <i class="fa-solid fa-file-excel"></i> Exportar (.xlsx)
+        </button>
+        <button onclick="purgarOcorrencias()" class="bg-rose-700/80 hover:bg-rose-600 text-white font-medium py-2 px-3 rounded-lg text-xs transition flex items-center gap-1.5" title="Limpar ocorrências salvas">
+          <i class="fa-solid fa-trash-can"></i> Limpar
+        </button>
+      </div>
+    </div>
+
+    <!-- SEÇÃO DO LIVRO DE TURNOS -->
+    <div id="secaoTurnos" class="space-y-6">
+      <!-- Barra de Filtros Global -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-filter text-indigo-400"></i> Filtros de Período e Segurança
+            </h2>
+            <p class="text-xs text-slate-400">Selecione o intervalo de datas ou segurança para recalcular as horas e a tabela.</p>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-slate-400 font-medium">De:</label>
+              <input type="date" id="filtroDataInicio" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-slate-400 font-medium">Até:</label>
+              <input type="date" id="filtroDataFim" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="text" id="filtroNome" placeholder="Segurança..." oninput="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 w-36">
+            </div>
+            <button onclick="limparFiltros()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-300 transition">
+              Limpar Filtros
+            </button>
+          </div>
         </div>
-        
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <label class="text-xs text-slate-400 font-medium">De:</label>
-            <input type="date" id="filtroDataInicio" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
+          <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-lg text-2xl">
+            <i class="fa-solid fa-clock"></i>
           </div>
-          <div class="flex items-center gap-2">
-            <label class="text-xs text-slate-400 font-medium">Até:</label>
-            <input type="date" id="filtroDataFim" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+          <div>
+            <span class="text-xs text-slate-400 font-medium">Horas no Período Selecionado</span>
+            <h3 id="kpiHoras" class="text-2xl font-bold text-slate-100">0h</h3>
           </div>
-          <div class="flex items-center gap-2">
-            <input type="text" id="filtroNome" placeholder="Segurança..." oninput="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 w-36">
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
+          <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg text-2xl">
+            <i class="fa-solid fa-person-military-pointing"></i>
           </div>
-          <button onclick="limparFiltros()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-300 transition">
+          <div>
+            <span class="text-xs text-slate-400 font-medium">Turnos no Período</span>
+            <h3 id="kpiTurnos" class="text-2xl font-bold text-slate-100">0</h3>
+          </div>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
+          <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg text-2xl">
+            <i class="fa-solid fa-user-shield"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 font-medium">Seguranças Ativos</span>
+            <h3 id="kpiSegurancas" class="text-2xl font-bold text-slate-100">0</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumo por Segurança no Período -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+        <h2 class="text-base font-semibold text-slate-200 mb-4">Total de Horas no Período por Segurança</h2>
+        <div id="cardsSegurancas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <!-- Preenchido via JS -->
+        </div>
+      </div>
+
+      <!-- Legenda de Cores para Auditoria -->
+      <div class="flex items-center gap-4 text-xs text-slate-400 px-1">
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500"></span> Concluído formal</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500"></span> Estimado por última foto/atividade (Atenção)</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-indigo-500/20 border border-indigo-500"></span> Ronda fotográfica contínua</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-cyan-500/20 border border-cyan-500"></span> Ajustado Manualmente</span>
+      </div>
+
+      <!-- Tabela de Turnos -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm">
+        <div class="p-5 border-b border-slate-700 flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-slate-200">Histórico Detalhado de Turnos</h2>
+          <span id="totalRegistrosBadge" class="text-xs bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-slate-400">0 registros</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-slate-900/60 text-slate-400 border-b border-slate-700 text-xs font-semibold uppercase tracking-wider">
+                <th class="py-3.5 px-4">Segurança</th>
+                <th class="py-3.5 px-4">Veículo</th>
+                <th class="py-3.5 px-4">Início (DD/MM/AAAA)</th>
+                <th class="py-3.5 px-4">Fim (DD/MM/AAAA)</th>
+                <th class="py-3.5 px-4">Duração</th>
+                <th class="py-3.5 px-4">Status</th>
+                <th class="py-3.5 px-4 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaCorpo" class="divide-y divide-slate-700 text-slate-300">
+              <tr>
+                <td colspan="7" class="py-8 text-center text-slate-500">Nenhum registro encontrado.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO DO LIVRO DE OCORRÊNCIAS DIGITAL -->
+    <div id="secaoOcorrencias" class="hidden space-y-6">
+      <!-- Banner Informativo -->
+      <div class="bg-gradient-to-r from-purple-950/40 via-slate-800 to-slate-800 border border-purple-500/30 rounded-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-book-open-reader text-purple-400"></i> Livro de Ocorrências Digital Automatizado
+          </h2>
+          <p class="text-xs text-slate-300 mt-1">
+            O Llama 3.1 local analisa as conversas e fotos do WhatsApp, filtrando saudações e identificando ocorrências de segurança, suspeitos, patrulhamento policial, árvores caídas, animais e problemas viários.
+          </p>
+        </div>
+        <div id="statusExtracaoIA" class="text-xs font-medium text-purple-300"></div>
+      </div>
+
+      <!-- KPIs de Ocorrências -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center gap-3">
+          <div class="p-3 bg-rose-500/10 text-rose-400 rounded-lg text-xl">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <div class="text-xs font-medium text-slate-400">Alta Severidade</div>
+            <div id="kpiOcorrenciasAlta" class="text-2xl font-bold text-rose-400">0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center gap-3">
+          <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg text-xl">
+            <i class="fa-solid fa-circle-exclamation"></i>
+          </div>
+          <div>
+            <div class="text-xs font-medium text-slate-400">Média Severidade</div>
+            <div id="kpiOcorrenciasMedia" class="text-2xl font-bold text-amber-400">0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center gap-3">
+          <div class="p-3 bg-sky-500/10 text-sky-400 rounded-lg text-xl">
+            <i class="fa-solid fa-shield"></i>
+          </div>
+          <div>
+            <div class="text-xs font-medium text-slate-400">Baixa / Ronda Prev.</div>
+            <div id="kpiOcorrenciasBaixa" class="text-2xl font-bold text-sky-400">0</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center gap-3">
+          <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-lg text-xl">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+          <div>
+            <div class="text-xs font-medium text-slate-400">Total de Ocorrências</div>
+            <div id="kpiOcorrenciasTotal" class="text-2xl font-bold text-indigo-400">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros de Ocorrências -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-3 flex-1">
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-slate-400 font-medium">Severidade:</label>
+              <select id="filtroOcorrSeveridade" onchange="carregarOcorrencias()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                <option value="">Todas</option>
+                <option value="Alta">🚨 Alta</option>
+                <option value="Média">⚠️ Média</option>
+                <option value="Baixa">ℹ️ Baixa</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-slate-400 font-medium">Categoria:</label>
+              <select id="filtroOcorrCategoria" onchange="carregarOcorrencias()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                <option value="">Todas</option>
+                <option value="Segurança / Suspeito">Segurança / Suspeito</option>
+                <option value="Infraestrutura / Vias">Infraestrutura / Vias</option>
+                <option value="Polícia / Ronda Preventiva">Polícia / Ronda Preventiva</option>
+                <option value="Perturbação do Sossego / Som">Perturbação do Sossego / Som</option>
+                <option value="Animais / Pets">Animais / Pets</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+              <input type="text" id="filtroOcorrBusca" placeholder="Buscar por rua, descrição, autor..." oninput="carregarOcorrencias()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <button onclick="limparFiltrosOcorrencias()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">
             Limpar Filtros
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- KPIs -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
-        <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-lg text-2xl">
-          <i class="fa-solid fa-clock"></i>
+      <!-- Tabela de Ocorrências -->
+      <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm">
+        <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+            <i class="fa-solid fa-list-ul text-amber-400"></i> Registro de Ocorrências Extraídas
+          </h2>
+          <span id="badgeTotalOcorrenciasTab" class="text-xs bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-slate-400">0 registros</span>
         </div>
-        <div>
-          <span class="text-xs text-slate-400 font-medium">Horas no Período Selecionado</span>
-          <h3 id="kpiHoras" class="text-2xl font-bold text-slate-100">0h</h3>
-        </div>
-      </div>
-      <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
-        <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg text-2xl">
-          <i class="fa-solid fa-person-military-pointing"></i>
-        </div>
-        <div>
-          <span class="text-xs text-slate-400 font-medium">Turnos no Período</span>
-          <h3 id="kpiTurnos" class="text-2xl font-bold text-slate-100">0</h3>
-        </div>
-      </div>
-      <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
-        <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg text-2xl">
-          <i class="fa-solid fa-user-shield"></i>
-        </div>
-        <div>
-          <span class="text-xs text-slate-400 font-medium">Seguranças Ativos</span>
-          <h3 id="kpiSegurancas" class="text-2xl font-bold text-slate-100">0</h3>
-        </div>
-      </div>
-    </div>
 
-    <!-- Resumo por Segurança no Período -->
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-      <h2 class="text-base font-semibold text-slate-200 mb-4">Total de Horas no Período por Segurança</h2>
-      <div id="cardsSegurancas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <!-- Preenchido via JS -->
-      </div>
-    </div>
-
-    <!-- Legenda de Cores para Auditoria -->
-    <div class="flex items-center gap-4 text-xs text-slate-400 px-1">
-      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500"></span> Concluído formal</span>
-      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500"></span> Estimado por última foto/atividade (Atenção)</span>
-      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-indigo-500/20 border border-indigo-500"></span> Ronda fotográfica contínua</span>
-      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-cyan-500/20 border border-cyan-500"></span> Ajustado Manualmente</span>
-    </div>
-
-    <!-- Tabela de Turnos -->
-    <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm">
-      <div class="p-5 border-b border-slate-700 flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-slate-200">Histórico Detalhado de Turnos</h2>
-        <span id="totalRegistrosBadge" class="text-xs bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-slate-400">0 registros</span>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr class="bg-slate-900/60 text-slate-400 border-b border-slate-700 text-xs font-semibold uppercase tracking-wider">
-              <th class="py-3.5 px-4">Segurança</th>
-              <th class="py-3.5 px-4">Veículo</th>
-              <th class="py-3.5 px-4">Início (DD/MM/AAAA)</th>
-              <th class="py-3.5 px-4">Fim (DD/MM/AAAA)</th>
-              <th class="py-3.5 px-4">Duração</th>
-              <th class="py-3.5 px-4">Status</th>
-              <th class="py-3.5 px-4 text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="tabelaCorpo" class="divide-y divide-slate-700 text-slate-300">
-            <tr>
-              <td colspan="7" class="py-8 text-center text-slate-500">Nenhum registro encontrado.</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="bg-slate-900/60 text-slate-400 border-b border-slate-700 text-xs font-semibold uppercase tracking-wider">
+                <th class="py-3.5 px-4">Data/Hora</th>
+                <th class="py-3.5 px-4">Severidade</th>
+                <th class="py-3.5 px-4">Categoria</th>
+                <th class="py-3.5 px-4">Local Citado</th>
+                <th class="py-3.5 px-4">Relatado Por</th>
+                <th class="py-3.5 px-4">Descrição Resumida (IA)</th>
+                <th class="py-3.5 px-4 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaOcorrenciasCorpo" class="divide-y divide-slate-700 text-slate-300">
+              <tr>
+                <td colspan="7" class="py-8 text-center text-slate-500">Nenhuma ocorrência registrada. Clique em "Extrair Ocorrências com IA" acima para processar o chat.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -213,8 +376,84 @@
     </div>
   </div>
 
+  <!-- Modal de Detalhes da Ocorrência (Mensagem Original WhatsApp) -->
+  <div id="modalOcorrencia" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-message text-indigo-400"></i> Detalhe da Mensagem Original
+        </h3>
+        <button onclick="fecharModalOcorrencia()" class="text-slate-400 hover:text-slate-200"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="grid grid-cols-2 gap-2">
+          <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-700">
+            <span class="text-slate-400 block text-[10px]">Data e Hora:</span>
+            <span id="modalOcDataHora" class="font-mono text-slate-200 font-semibold"></span>
+          </div>
+          <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-700">
+            <span class="text-slate-400 block text-[10px]">Relatado Por:</span>
+            <span id="modalOcAutor" class="text-slate-200 font-semibold"></span>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-700">
+          <span class="text-slate-400 block text-[10px]">Local Citado:</span>
+          <span id="modalOcLocal" class="text-slate-200 font-semibold"></span>
+        </div>
+
+        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700">
+          <span class="text-slate-400 block text-[10px] mb-1">Resumo Interpretado pela IA:</span>
+          <p id="modalOcDescricao" class="text-slate-200 leading-relaxed"></p>
+        </div>
+
+        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-400/90 whitespace-pre-wrap max-h-40 overflow-y-auto">
+          <span class="text-slate-400 block text-[10px] font-sans mb-1">Texto Bruto do WhatsApp:</span>
+          <div id="modalOcMsgOriginal"></div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="fecharModalOcorrencia()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-white transition">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let turnosEmMemoria = [];
+    let ocorrenciasEmMemoria = [];
+    let abaAtiva = 'turnos';
+
+    function alternarAba(aba) {
+      abaAtiva = aba;
+      const secaoTurnos = document.getElementById('secaoTurnos');
+      const secaoOcorrencias = document.getElementById('secaoOcorrencias');
+      const tabBtnTurnos = document.getElementById('tabBtnTurnos');
+      const tabBtnOcorrencias = document.getElementById('tabBtnOcorrencias');
+      const acoesTurnos = document.getElementById('acoesTurnos');
+      const acoesOcorrencias = document.getElementById('acoesOcorrencias');
+
+      if (aba === 'turnos') {
+        secaoTurnos.classList.remove('hidden');
+        secaoOcorrencias.classList.add('hidden');
+        acoesTurnos.classList.remove('hidden');
+        acoesOcorrencias.classList.add('hidden');
+
+        tabBtnTurnos.className = "px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2.5 bg-indigo-600 text-white shadow-lg shadow-indigo-900/40";
+        tabBtnOcorrencias.className = "px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700";
+      } else {
+        secaoTurnos.classList.add('hidden');
+        secaoOcorrencias.classList.remove('hidden');
+        acoesTurnos.classList.add('hidden');
+        acoesOcorrencias.classList.remove('hidden');
+
+        tabBtnOcorrencias.className = "px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2.5 bg-amber-600 text-white shadow-lg shadow-amber-900/40";
+        tabBtnTurnos.className = "px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700";
+
+        carregarOcorrenciasDados();
+      }
+    }
 
     function formatarHM(horasDec) {
       if (horasDec === null || horasDec === undefined || horasDec < 0) return "-";
@@ -543,7 +782,211 @@
       carregarDados();
     }
 
-    window.onload = carregarDados;
+    // ================= FUNÇÕES DO LIVRO DE OCORRÊNCIAS =================
+    
+    async function carregarOcorrenciasDados() {
+      await Promise.all([carregarOcorrencias(), carregarOcorrenciasResumo()]);
+    }
+
+    async function carregarOcorrenciasResumo() {
+      try {
+        const res = await fetch('/api/ocorrencias/resumo');
+        const data = await res.json();
+        
+        document.getElementById('kpiOcorrenciasAlta').innerText = (data.por_severidade && data.por_severidade.Alta) || 0;
+        document.getElementById('kpiOcorrenciasMedia').innerText = (data.por_severidade && data.por_severidade.Média) || 0;
+        document.getElementById('kpiOcorrenciasBaixa').innerText = (data.por_severidade && data.por_severidade.Baixa) || 0;
+        document.getElementById('kpiOcorrenciasTotal').innerText = data.total || 0;
+        
+        const badge = document.getElementById('badgeQtdOcorrencias');
+        badge.innerText = data.total || 0;
+        if (data.total > 0) {
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      } catch (e) {
+        console.error("Erro ao carregar resumo de ocorrências", e);
+      }
+    }
+
+    function obterParametrosFiltroOcorrencias() {
+      const sev = document.getElementById('filtroOcorrSeveridade').value;
+      const cat = document.getElementById('filtroOcorrCategoria').value;
+      const busca = document.getElementById('filtroOcorrBusca').value.trim();
+
+      let params = new URLSearchParams();
+      if (sev) params.append("severidade", sev);
+      if (cat) params.append("categoria", cat);
+      if (busca) params.append("busca", busca);
+
+      return params.toString();
+    }
+
+    async function carregarOcorrencias() {
+      const q = obterParametrosFiltroOcorrencias();
+      try {
+        const res = await fetch('/api/ocorrencias?' + q);
+        const ocorrencias = await res.json();
+        ocorrenciasEmMemoria = ocorrencias;
+
+        const tbody = document.getElementById('tabelaOcorrenciasCorpo');
+        const badge = document.getElementById('badgeTotalOcorrenciasTab');
+        tbody.innerHTML = '';
+        badge.innerText = ocorrencias.length + ' registros';
+
+        if (ocorrencias.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500">Nenhuma ocorrência encontrada. Clique em "Extrair Ocorrências com IA" acima para processar o chat.</td></tr>`;
+          return;
+        }
+
+        ocorrencias.forEach(o => {
+          let badgeSev = 'bg-sky-500/10 text-sky-400 border border-sky-500/20';
+          let rowHighlight = '';
+
+          if (o.severidade === 'Alta') {
+            badgeSev = 'bg-rose-500/20 text-rose-300 border border-rose-500/50 font-bold';
+            rowHighlight = 'bg-rose-950/20';
+          } else if (o.severidade === 'Média') {
+            badgeSev = 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold';
+            rowHighlight = 'bg-amber-950/10';
+          }
+
+          let iconCat = 'fa-tag';
+          if (o.categoria.includes('Segurança') || o.categoria.includes('Suspeito')) iconCat = 'fa-shield-halved text-rose-400';
+          else if (o.categoria.includes('Infraestrutura') || o.categoria.includes('Vias')) iconCat = 'fa-triangle-exclamation text-amber-400';
+          else if (o.categoria.includes('Polícia') || o.categoria.includes('Ronda')) iconCat = 'fa-car-side text-sky-400';
+          else if (o.categoria.includes('Sossego') || o.categoria.includes('Som')) iconCat = 'fa-volume-high text-purple-400';
+          else if (o.categoria.includes('Animais') || o.categoria.includes('Pets')) iconCat = 'fa-paw text-emerald-400';
+
+          const localFmt = o.local && o.local !== 'Não informado' ? `<span class="flex items-center gap-1"><i class="fa-solid fa-location-dot text-rose-400/80 text-xs"></i> ${o.local}</span>` : '<span class="text-slate-500">Não informado</span>';
+
+          tbody.innerHTML += `
+            <tr class="${rowHighlight} hover:bg-slate-700/30 transition border-b border-slate-700/60">
+              <td class="py-3 px-4 font-mono text-xs whitespace-nowrap text-slate-300">${o.data_hora_br || o.data_hora}</td>
+              <td class="py-3 px-4 whitespace-nowrap">
+                <span class="px-2.5 py-1 rounded-full text-xs ${badgeSev}">${o.severidade}</span>
+              </td>
+              <td class="py-3 px-4 whitespace-nowrap text-xs text-slate-200">
+                <span class="flex items-center gap-1.5"><i class="fa-solid ${iconCat}"></i> ${o.categoria}</span>
+              </td>
+              <td class="py-3 px-4 text-xs font-medium text-slate-300">${localFmt}</td>
+              <td class="py-3 px-4 text-xs font-medium text-slate-300 whitespace-nowrap">${o.autor}</td>
+              <td class="py-3 px-4 text-xs text-slate-200">${o.descricao}</td>
+              <td class="py-3 px-4 text-center whitespace-nowrap">
+                <div class="flex items-center justify-center gap-1.5">
+                  <button onclick="abrirModalOcorrencia(${o.id})" class="text-xs bg-slate-700/80 hover:bg-indigo-600 text-slate-200 hover:text-white px-2 py-1 rounded-lg transition" title="Ver mensagem original do WhatsApp">
+                    <i class="fa-solid fa-message text-xs"></i>
+                  </button>
+                  <button onclick="deletarOcorrencia(${o.id})" class="text-xs bg-slate-700/80 hover:bg-rose-600 text-slate-400 hover:text-white px-2 py-1 rounded-lg transition" title="Excluir ocorrência">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        });
+      } catch (e) {
+        console.error("Erro ao carregar ocorrências", e);
+      }
+    }
+
+    async function extrairOcorrenciasComIA() {
+      const btn = document.getElementById('btnExtrairOcorrencias');
+      const statusLabel = document.getElementById('statusExtracaoIA');
+      let originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Extraindo com Llama 3.1...</span>';
+      statusLabel.innerText = "Ollama analisando conversas e relatos do histórico...";
+      statusLabel.className = "text-xs font-medium text-purple-300";
+
+      try {
+        const res = await fetch('/api/ocorrencias/extrair', { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+          statusLabel.innerText = data.mensagem;
+          statusLabel.className = "text-xs font-medium text-emerald-400";
+          await carregarOcorrenciasDados();
+        } else {
+          statusLabel.innerText = data.detail || "Erro ao extrair ocorrências.";
+          statusLabel.className = "text-xs font-medium text-rose-400";
+          alert(data.detail || "Falha na extração com IA.");
+        }
+      } catch (e) {
+        statusLabel.innerText = "Erro ao contatar o servidor/Ollama.";
+        statusLabel.className = "text-xs font-medium text-rose-400";
+        alert("Erro na requisição: " + e);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    }
+
+    function abrirModalOcorrencia(id) {
+      const o = ocorrenciasEmMemoria.find(x => x.id === id);
+      if (!o) return;
+
+      document.getElementById('modalOcDataHora').innerText = o.data_hora_br || o.data_hora;
+      document.getElementById('modalOcAutor').innerText = o.autor;
+      document.getElementById('modalOcLocal').innerText = o.local || 'Não informado';
+      document.getElementById('modalOcDescricao').innerText = o.descricao;
+      document.getElementById('modalOcMsgOriginal').innerText = o.mensagem_original || '(Sem mensagem original armazenada)';
+
+      document.getElementById('modalOcorrencia').classList.remove('hidden');
+    }
+
+    function fecharModalOcorrencia() {
+      document.getElementById('modalOcorrencia').classList.add('hidden');
+    }
+
+    async function deletarOcorrencia(id) {
+      if (!confirm("Deseja remover esta ocorrência do livro?")) return;
+
+      try {
+        const res = await fetch(`/api/ocorrencias/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          await carregarOcorrenciasDados();
+        } else {
+          alert("Erro ao remover ocorrência.");
+        }
+      } catch (e) {
+        alert("Falha na comunicação com o servidor.");
+      }
+    }
+
+    async function purgarOcorrencias() {
+      if (!confirm("Tem certeza que deseja apagar todas as ocorrências salvas? Você poderá extraí-las novamente a qualquer momento com o botão de IA.")) return;
+
+      try {
+        const res = await fetch('/api/ocorrencias/purgar', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          await carregarOcorrenciasDados();
+        } else {
+          alert("Erro ao limpar ocorrências: " + (data.detail || "Erro desconhecido"));
+        }
+      } catch (e) {
+        alert("Falha de comunicação: " + e);
+      }
+    }
+
+    function exportarOcorrenciasExcel() {
+      const q = obterParametrosFiltroOcorrencias();
+      window.location.href = '/api/ocorrencias/exportar?' + q;
+    }
+
+    function limparFiltrosOcorrencias() {
+      document.getElementById('filtroOcorrSeveridade').value = '';
+      document.getElementById('filtroOcorrCategoria').value = '';
+      document.getElementById('filtroOcorrBusca').value = '';
+      carregarOcorrencias();
+    }
+
+    window.onload = () => {
+      carregarDados();
+      carregarOcorrenciasResumo();
+    };
   </script>
 </body>
 </html>

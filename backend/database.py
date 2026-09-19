@@ -29,6 +29,24 @@ def init_db():
         UNIQUE(seguranca, data_inicio)
     );
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ocorrencias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT NOT NULL,
+        data_hora_br TEXT,
+        autor TEXT,
+        categoria TEXT NOT NULL,
+        severidade TEXT NOT NULL,
+        local TEXT,
+        descricao TEXT NOT NULL,
+        mensagem_original TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(data_hora, autor, descricao)
+    );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ocorrencias_data ON ocorrencias(data_hora);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ocorrencias_severidade ON ocorrencias(severidade);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ocorrencias_categoria ON ocorrencias(categoria);")
     conn.commit()
     conn.close()
 
@@ -163,3 +181,127 @@ def obter_turno_por_id(turno_id: int) -> Optional[Dict[str, Any]]:
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+# ----------------- OCORRÊNCIAS -----------------
+
+def salvar_ocorrencias(ocorrencias: List[Dict[str, Any]]) -> int:
+    conn = get_db()
+    cursor = conn.cursor()
+    inseridos = 0
+    for o in ocorrencias:
+        try:
+            cursor.execute("""
+            INSERT OR IGNORE INTO ocorrencias (
+                data_hora, data_hora_br, autor, categoria, severidade, local, descricao, mensagem_original
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                o.get("data_hora"),
+                o.get("data_hora_br"),
+                o.get("autor"),
+                o.get("categoria"),
+                o.get("severidade"),
+                o.get("local"),
+                o.get("descricao"),
+                o.get("mensagem_original")
+            ))
+            if cursor.rowcount > 0:
+                inseridos += 1
+        except Exception as e:
+            print(f"Erro ao salvar ocorrencia: {e}")
+    conn.commit()
+    conn.close()
+    return inseridos
+
+def listar_ocorrencias(
+    categoria: Optional[str] = None,
+    severidade: Optional[str] = None,
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
+    busca: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    filtros = []
+    params = []
+    
+    if categoria:
+        filtros.append("categoria = ?")
+        params.append(categoria)
+        
+    if severidade:
+        filtros.append("severidade = ?")
+        params.append(severidade)
+        
+    if data_inicio:
+        filtros.append("data_hora >= ?")
+        params.append(f"{data_inicio} 00:00")
+        
+    if data_fim:
+        filtros.append("data_hora <= ?")
+        params.append(f"{data_fim} 23:59")
+        
+    if busca:
+        filtros.append("(descricao LIKE ? OR local LIKE ? OR autor LIKE ? OR mensagem_original LIKE ?)")
+        termo = f"%{busca}%"
+        params.extend([termo, termo, termo, termo])
+        
+    where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
+    query = f"SELECT * FROM ocorrencias {where} ORDER BY data_hora DESC"
+    
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def obter_resumo_ocorrencias() -> Dict[str, Any]:
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) as total FROM ocorrencias")
+    total = cursor.fetchone()["total"]
+    
+    cursor.execute("""
+    SELECT severidade, COUNT(*) as qtd 
+    FROM ocorrencias 
+    GROUP BY severidade
+    """)
+    por_sev = {r["severidade"]: r["qtd"] for r in cursor.fetchall()}
+    
+    cursor.execute("""
+    SELECT categoria, COUNT(*) as qtd 
+    FROM ocorrencias 
+    GROUP BY categoria 
+    ORDER BY qtd DESC
+    """)
+    por_cat = [dict(r) for r in cursor.fetchall()]
+    
+    conn.close()
+    return {
+        "total": total,
+        "por_severidade": {
+            "Alta": por_sev.get("Alta", 0),
+            "Média": por_sev.get("Média", 0),
+            "Baixa": por_sev.get("Baixa", 0)
+        },
+        "por_categoria": por_cat
+    }
+
+def deletar_ocorrencia(ocorrencia_id: int) -> bool:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ocorrencias WHERE id = ?", (ocorrencia_id,))
+    afetados = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return afetados > 0
+
+def purgar_ocorrencias() -> int:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ocorrencias")
+    removidos = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return removidos
+

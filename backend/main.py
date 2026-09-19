@@ -8,9 +8,13 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno, purgar_turnos, obter_turno_por_id
+from backend.database import (
+    init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno, purgar_turnos, obter_turno_por_id,
+    salvar_ocorrencias, listar_ocorrencias, obter_resumo_ocorrencias, deletar_ocorrencia, purgar_ocorrencias
+)
 from backend.parser import processar_chat_whatsapp, extrair_mensagens_chat
 from backend.auditor_ia import auditar_turno_com_ollama
+from backend.extrator_ocorrencias import extrair_todas_ocorrencias
 
 CHAT_CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ultimo_chat.txt")
 
@@ -206,6 +210,112 @@ def exportar_excel(
     
     headers = {
         "Content-Disposition": "attachment; filename=relatorio_rondas_br.xlsx"
+    }
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers
+    )
+
+# ----------------- ROTAS DE OCORRÊNCIAS (LIVRO DIGITAL) -----------------
+
+@app.post("/api/ocorrencias/extrair")
+async def rota_extrair_ocorrencias(data_minima: Optional[str] = Query("2026-06-01")):
+    if not os.path.exists(CHAT_CACHE_PATH):
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhum arquivo de chat carregado. Faça o upload do arquivo .txt primeiro."
+        )
+        
+    try:
+        with open(CHAT_CACHE_PATH, "r", encoding="utf-8") as f:
+            chat_texto = f.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao ler arquivo de chat: {e}")
+        
+    ocorrencias = await extrair_todas_ocorrencias(chat_texto, data_minima_str=data_minima)
+    total_inseridos = salvar_ocorrencias(ocorrencias)
+    
+    return {
+        "sucesso": True,
+        "mensagem": f"{len(ocorrencias)} ocorrências analisadas pela IA e sincronizadas!",
+        "novas_inseridas": total_inseridos,
+        "total_encontradas": len(ocorrencias)
+    }
+
+@app.get("/api/ocorrencias")
+def get_ocorrencias(
+    categoria: Optional[str] = Query(None),
+    severidade: Optional[str] = Query(None),
+    data_inicio: Optional[str] = Query(None),
+    data_fim: Optional[str] = Query(None),
+    busca: Optional[str] = Query(None)
+):
+    return listar_ocorrencias(
+        categoria=categoria,
+        severidade=severidade,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        busca=busca
+    )
+
+@app.get("/api/ocorrencias/resumo")
+def get_ocorrencias_resumo():
+    return obter_resumo_ocorrencias()
+
+@app.delete("/api/ocorrencias/{ocorrencia_id}")
+def delete_ocorrencia(ocorrencia_id: int):
+    sucesso = deletar_ocorrencia(ocorrencia_id)
+    if not sucesso:
+        raise HTTPException(status_code=404, detail="Ocorrência não encontrada.")
+    return {"mensagem": "Ocorrência removida com sucesso."}
+
+@app.post("/api/ocorrencias/purgar")
+def post_purgar_ocorrencias():
+    removidos = purgar_ocorrencias()
+    return {"mensagem": f"Livro de ocorrências limpo com sucesso! {removidos} registros removidos.", "removidos": removidos}
+
+@app.get("/api/ocorrencias/exportar")
+def exportar_ocorrencias_excel(
+    categoria: Optional[str] = Query(None),
+    severidade: Optional[str] = Query(None),
+    data_inicio: Optional[str] = Query(None),
+    data_fim: Optional[str] = Query(None),
+    busca: Optional[str] = Query(None)
+):
+    ocorrencias = listar_ocorrencias(
+        categoria=categoria,
+        severidade=severidade,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        busca=busca
+    )
+    if not ocorrencias:
+        raise HTTPException(status_code=404, detail="Nenhuma ocorrência encontrada para exportar.")
+        
+    df = pd.DataFrame(ocorrencias)
+    
+    colunas_renomeadas = {
+        "id": "ID",
+        "data_hora_br": "Data e Hora",
+        "severidade": "Severidade",
+        "categoria": "Categoria",
+        "local": "Local / Ponto de Referência",
+        "autor": "Relatado Por",
+        "descricao": "Descrição Resumida (IA)",
+        "mensagem_original": "Mensagem Original WhatsApp"
+    }
+    df = df.rename(columns=colunas_renomeadas)
+    colunas_finais = [c for c in colunas_renomeadas.values() if c in df.columns]
+    df = df[colunas_finais]
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Livro_de_Ocorrencias")
+    output.seek(0)
+    
+    headers = {
+        "Content-Disposition": "attachment; filename=livro_de_ocorrencias.xlsx"
     }
     return StreamingResponse(
         output,
