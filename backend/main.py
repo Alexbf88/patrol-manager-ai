@@ -32,6 +32,22 @@ app.add_middleware(
 def startup():
     init_db()
 
+@app.get("/healthz", tags=["Observability"])
+def healthz():
+    return {"status": "healthy", "service": "patrol-manager-ai"}
+
+@app.get("/readyz", tags=["Observability"])
+def readyz():
+    try:
+        from backend.database import get_db
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        return {"status": "ready", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database not ready: {e}")
+
 def formatar_data_br(data_iso_str: Optional[str]) -> str:
     if not data_iso_str:
         return "-"

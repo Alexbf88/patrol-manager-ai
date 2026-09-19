@@ -19,6 +19,7 @@ config/contacts.json
 # Sensitive Raw WhatsApp Chat Exports
 *.log
 *.txt
+!requirements*.txt
 !samples/sample_chat.txt
 
 # OS & Editor files

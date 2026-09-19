@@ -99,8 +99,10 @@ def identificar_seguranca(remetente: str) -> Optional[str]:
 
     if rem in MAPA_CONTATOS:
         return MAPA_CONTATOS[rem]
+    if rem in MAPA_CONTATOS.values():
+        return rem
     for tel, nome in MAPA_CONTATOS.items():
-        if tel in rem:
+        if tel in rem or nome in rem:
             return nome
         
     return None

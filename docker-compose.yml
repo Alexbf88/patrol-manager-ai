@@ -5,6 +5,10 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+      - ./config:/app/config
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./tests:/app/tests
     environment:
       - DB_PATH=/app/data/rondas.db
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
