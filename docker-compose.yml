@@ -6,9 +6,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./config:/app/config
-      - ./backend:/app/backend
-      - ./frontend:/app/frontend
-      - ./tests:/app/tests
     environment:
       - DB_PATH=/app/data/rondas.db
       - AI_PROVIDER=ollama # 'ollama' or 'openai' (cloud)

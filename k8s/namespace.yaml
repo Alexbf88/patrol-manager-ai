@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: patrol-system
-  labels:
-    app.kubernetes.io/name: patrol-manager-ai
-    app.kubernetes.io/part-of: security-suite
