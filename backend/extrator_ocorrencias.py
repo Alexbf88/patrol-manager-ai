@@ -5,9 +5,7 @@ import httpx
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from backend.parser import parse_data_hora, identificar_seguranca
-
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:latest")
+from backend.ai_client import chamar_ia_json, get_ai_config
 
 MSG_LINE_REGEX = re.compile(r"^(\d{1,2}/\d{1,2}/\d{2,4}),?\s+(\d{1,2}:\d{2})\s*-\s*([^:]+):\s*(.*)$")
 
@@ -160,27 +158,11 @@ Se não houver nenhuma ocorrência relevante no bloco, retorne: {{"ocorrencias":
 """
 
     try:
-        resp = await client.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "format": "json"
-            },
-            timeout=85.0
-        )
-        if resp.status_code != 200:
-            print(f"Aviso: Ollama retornou HTTP {resp.status_code}")
+        sucesso, parsed, msg_status = await chamar_ia_json(prompt, client=client, timeout=85.0)
+        if not sucesso or not isinstance(parsed, dict):
+            print(f"Aviso da IA ao extrair ocorrências: {msg_status}")
             return []
             
-        data = resp.json()
-        resp_texto = data.get("response", "{}").strip()
-        if resp_texto.startswith("```"):
-            resp_texto = re.sub(r"^```(?:json)?\s*", "", resp_texto)
-            resp_texto = re.sub(r"\s*```$", "", resp_texto)
-            
-        parsed = json.loads(resp_texto)
         ocorrencias = parsed.get("ocorrencias", [])
         
         resultado = []

@@ -1,12 +1,9 @@
 import os
 import re
 import json
-import httpx
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:latest")
+from backend.ai_client import chamar_ia_json, get_ai_config
 
 async def auditar_turno_com_ollama(turno: Dict[str, Any], mensagens_chat: list) -> Dict[str, Any]:
     seguranca = turno["seguranca"]
@@ -64,52 +61,30 @@ Responda ESTRITAMENTE em formato JSON com o seguinte schema:
 }}
 """
 
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                f"{OLLAMA_BASE_URL}/api/generate",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "format": "json"
-                }
-            )
-            
-            if resp.status_code != 200:
-                return {
-                    "sucesso": False,
-                    "mensagem": f"Erro na resposta do Ollama: HTTP {resp.status_code}"
-                }
-                
-            data = resp.json()
-            resposta_texto = data.get("response", "{}").strip()
-            if resposta_texto.startswith("```"):
-                resposta_texto = re.sub(r"^```(?:json)?\s*", "", resposta_texto)
-                resposta_texto = re.sub(r"\s*```$", "", resposta_texto)
-            resultado_json = json.loads(resposta_texto)
-            
-            # Validação simples do retorno
-            data_fim_sug = resultado_json.get("data_fim_sugerida")
-            justificativa = resultado_json.get("justificativa", "Sugerido por auditoria de IA")
-            confianca = resultado_json.get("confianca", "Média")
-            
-            return {
-                "sucesso": True,
-                "data_inicio": data_inicio_str,
-                "data_fim_sugerida": data_fim_sug,
-                "justificativa": justificativa,
-                "confianca": confianca,
-                "modelo_usado": OLLAMA_MODEL
-            }
-            
-    except httpx.ConnectError:
+    cfg = get_ai_config()
+    sucesso, resultado_json, msg_status = await chamar_ia_json(prompt, timeout=80.0)
+    
+    if not sucesso:
         return {
             "sucesso": False,
-            "mensagem": f"Não foi possível conectar ao Ollama em {OLLAMA_BASE_URL}. Verifique se o serviço está rodando no host."
+            "mensagem": msg_status
         }
-    except Exception as e:
+        
+    if not isinstance(resultado_json, dict):
         return {
             "sucesso": False,
-            "mensagem": f"Falha na auditoria com Ollama: {str(e)}"
+            "mensagem": "A resposta da IA não corresponde ao formato de objeto esperado."
         }
+        
+    data_fim_sug = resultado_json.get("data_fim_sugerida")
+    justificativa = resultado_json.get("justificativa", "Sugerido por auditoria de IA")
+    confianca = resultado_json.get("confianca", "Média")
+    
+    return {
+        "sucesso": True,
+        "data_inicio": data_inicio_str,
+        "data_fim_sugerida": data_fim_sug,
+        "justificativa": justificativa,
+        "confianca": confianca,
+        "modelo_usado": f"{cfg['provider']}:{cfg['model']}"
+    }

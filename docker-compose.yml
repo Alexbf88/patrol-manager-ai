@@ -11,6 +11,10 @@ services:
       - ./tests:/app/tests
     environment:
       - DB_PATH=/app/data/rondas.db
+      - AI_PROVIDER=ollama # 'ollama' or 'openai' (cloud)
+      - AI_BASE_URL=http://host.docker.internal:11434 # e.g. https://api.openai.com/v1 or https://api.groq.com/openai/v1
+      - AI_MODEL=llama3.1:latest # e.g. gpt-4o-mini or llama-3.1-70b-versatile
+      - AI_API_KEY= # Bearer token for cloud AI providers
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - OLLAMA_MODEL=llama3.1:latest
     extra_hosts:

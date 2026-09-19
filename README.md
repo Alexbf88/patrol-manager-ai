@@ -115,6 +115,22 @@ flowchart TD
 
 ---
 
+### 🧠 Flexible AI Engine Configuration (Local Ollama vs Cloud)
+
+Patrol Manager AI supports both **Local GPU/CPU inference** (Ollama) and **Cloud AI Providers** (OpenAI, Groq, OpenRouter, DeepSeek, Together, vLLM) via standard environment variables:
+
+| Variable | Default | Description | Example Cloud (Groq / OpenAI) |
+| :--- | :--- | :--- | :--- |
+| `AI_PROVIDER` | `ollama` | Provider type (`ollama` or `openai` / `cloud`) | `openai` |
+| `AI_BASE_URL` | `http://host.docker.internal:11434` | API endpoint base URL | `https://api.groq.com/openai/v1` |
+| `AI_MODEL` | `llama3.1:latest` | Model identifier | `llama-3.1-70b-versatile` or `gpt-4o-mini` |
+| `AI_API_KEY` | *(empty)* | Bearer authentication token for Cloud APIs | `gsk_...` or `sk-proj-...` |
+
+> [!TIP]
+> To use a cloud provider, simply set `AI_API_KEY` and `AI_BASE_URL` in your `.env` or `docker-compose.yml`. The system auto-detects cloud mode when an API key is provided!
+
+---
+
 ### Option 2: Local Python Setup
 
 ```bash
