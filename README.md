@@ -1,4 +1,4 @@
-# 🛡️ Sentinel Patrol - Automated Shift Auditor & AI Incident Logbook
+# 🛡️ Patrol Manager AI - Automated Shift Auditor & Incident Logbook
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -95,8 +95,8 @@ flowchart TD
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/<your-username>/sentinel-patrol-ai.git
-   cd sentinel-patrol-ai
+   git clone https://github.com/<your-username>/patrol-manager-ai.git
+   cd patrol-manager-ai
    ```
 
 2. **(Optional) Start Ollama for AI auditing & incident extraction:**
