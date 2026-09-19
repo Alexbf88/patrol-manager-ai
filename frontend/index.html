@@ -95,17 +95,25 @@
           <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2">
               <label class="text-xs text-slate-400 font-medium">De:</label>
-              <input type="date" id="filtroDataInicio" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+              <input type="date" id="filtroDataInicio" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
             </div>
             <div class="flex items-center gap-2">
               <label class="text-xs text-slate-400 font-medium">Até:</label>
-              <input type="date" id="filtroDataFim" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+              <input type="date" id="filtroDataFim" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
             </div>
             <div class="flex items-center gap-2">
-              <input type="text" id="filtroNome" placeholder="Segurança..." oninput="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 w-36">
+              <label class="text-xs text-slate-400 font-medium">Segurança:</label>
+              <select id="filtroNome" onchange="carregarDados()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                <option value="">Todos os Seguranças</option>
+                <option value="Marcos Silva">Marcos Silva</option>
+                <option value="Carlos Oliveira">Carlos Oliveira</option>
+                <option value="Alexandre Santos">Alexandre Santos</option>
+                <option value="Eduardo Lima">Eduardo Lima</option>
+                <option value="Lucas Ferreira">Lucas Ferreira</option>
+              </select>
             </div>
-            <button onclick="limparFiltros()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-300 transition">
-              Limpar Filtros
+            <button onclick="limparFiltros()" class="text-xs bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-rotate text-xs"></i> Limpar Filtros / Ver Tudo
             </button>
           </div>
         </div>
@@ -528,7 +536,15 @@
         badge.innerText = turnos.length + ' registros';
 
         if (turnos.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500">Nenhum turno encontrado com os filtros atuais.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 space-y-2">
+            <div class="text-base font-semibold text-slate-300">Nenhum turno encontrado com os filtros ativos.</div>
+            <div class="text-xs text-slate-500">Verifique se as datas de início/fim ou o segurança possuem registros na base.</div>
+            <div class="pt-2">
+              <button onclick="limparFiltros()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow-md">
+                <i class="fa-solid fa-arrows-rotate"></i> Limpar Filtros e Mostrar Todos os Turnos
+              </button>
+            </div>
+          </td></tr>`;
           return;
         }
 
