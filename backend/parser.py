@@ -6,29 +6,42 @@ MSG_PATTERN = re.compile(
     r"^(\d{1,2}/\d{1,2}/\d{2,4}),?\s+(\d{1,2}:\d{2})\s*-\s*([^:]+):\s*(.*)$"
 )
 
-# Mapeamento estrito da EQUIPE OFICIAL DE SEGURANÇAS:
-MAPA_CONTATOS = {
-    "+55 11 99999-0001": "Marcos Silva",
-    "Marcos Silva": "Marcos Silva",
-    "+55 11 99999-0002": "Carlos Oliveira",
-    "Carlos Oliveira": "Carlos Oliveira",
-    "Carlos Oliveira": "Carlos Oliveira",
-    "+55 11 99999-0003": "Alexandre Santos",
-    "+55 11 999990001": "Alexandre Santos",
-    "Alexandre Santos": "Alexandre Santos",
-    "+55 15 99999-0004": "Lucas Ferreira",
-    "Lucas Ferreira": "Lucas Ferreira",
-    "Lucas Ferreira": "Lucas Ferreira",
-    "Eduardo Lima": "Eduardo Lima",
-    "Eduardo Lima": "Eduardo Lima"
-}
+import os
+import json
 
-# Remetentes expressamente ignorados (portaria, avisos administrativos, etc.)
-REMETENTES_IGNORADOS = {
-    "Servicos Gerais - Terceirizado",
-    "+55 11 99999-0005",
-    "Administracao"
-}
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "contacts.json")
+EXAMPLE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "contacts.example.json")
+
+def carregar_configuracao_contatos():
+    target_path = CONFIG_PATH if os.path.exists(CONFIG_PATH) else EXAMPLE_CONFIG_PATH
+    if os.path.exists(target_path):
+        try:
+            with open(target_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                return cfg.get("guards", {}), set(cfg.get("ignored_senders", []))
+        except Exception as e:
+            print(f"Aviso ao carregar {target_path}: {e}")
+            
+    # Mapeamento fallback padrão caso os arquivos não existam
+    padrao_guards = {
+        "+55 11 99999-0001": "Marcos Silva",
+        "Marcos Silva": "Marcos Silva",
+        "+55 11 99999-0002": "Carlos Oliveira",
+        "Carlos Oliveira": "Carlos Oliveira",
+        "Carlos Oliveira": "Carlos Oliveira",
+        "+55 11 99999-0003": "Alexandre Santos",
+        "+55 11 999990001": "Alexandre Santos",
+        "Alexandre Santos": "Alexandre Santos",
+        "+55 15 99999-0004": "Lucas Ferreira",
+        "Lucas Ferreira": "Lucas Ferreira",
+        "Lucas Ferreira": "Lucas Ferreira",
+        "Eduardo Lima": "Eduardo Lima",
+        "Eduardo Lima": "Eduardo Lima"
+    }
+    padrao_ignorados = {"Servicos Gerais - Terceirizado", "+55 11 99999-0005", "Administracao"}
+    return padrao_guards, padrao_ignorados
+
+MAPA_CONTATOS, REMETENTES_IGNORADOS = carregar_configuracao_contatos()
 
 # Regex para extrair horário retroativo mencionado na mensagem
 # Ex: "encerrado as 16.45", "encerrando as 16.45", "encerrando 17:00", "encerrado 16h30", "encerrei as 18:00"
