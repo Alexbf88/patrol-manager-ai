@@ -115,19 +115,61 @@ flowchart TD
 
 ---
 
-### 🧠 Flexible AI Engine Configuration (Local Ollama vs Cloud)
+## ⚙️ Environment Variables & AI Configuration
 
-Patrol Manager AI supports both **Local GPU/CPU inference** (Ollama) and **Cloud AI Providers** (OpenAI, Groq, OpenRouter, DeepSeek, Together, vLLM) via standard environment variables:
+Patrol Manager AI is designed to run seamlessly with zero configuration out of the box, but can be customized via environment variables or a `.env` file in the project root:
 
-| Variable | Default | Description | Example Cloud (Groq / OpenAI) |
-| :--- | :--- | :--- | :--- |
-| `AI_PROVIDER` | `ollama` | Provider type (`ollama` or `openai` / `cloud`) | `openai` |
-| `AI_BASE_URL` | `http://host.docker.internal:11434` | API endpoint base URL | `https://api.groq.com/openai/v1` |
-| `AI_MODEL` | `llama3.1:latest` | Model identifier | `llama-3.1-70b-versatile` or `gpt-4o-mini` |
-| `AI_API_KEY` | *(empty)* | Bearer authentication token for Cloud APIs | `gsk_...` or `sk-proj-...` |
+```bash
+cp .env.example .env
+```
 
-> [!TIP]
-> To use a cloud provider, simply set `AI_API_KEY` and `AI_BASE_URL` in your `.env` or `docker-compose.yml`. The system auto-detects cloud mode when an API key is provided!
+### Complete Environment Variables Reference
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `DB_PATH` | `/app/data/rondas.db` | Path to SQLite database file inside the container |
+| `AI_PROVIDER` | `ollama` | Provider engine (`ollama` or `openai`). Automatically switches to cloud mode if `AI_API_KEY` is provided |
+| `AI_BASE_URL` | `http://host.docker.internal:11434` | Base URL for LLM API requests (Ollama or OpenAI-compatible endpoint) |
+| `AI_MODEL` | `llama3.1:latest` | Model identifier to use for shift auditing and occurrence extraction |
+| `AI_API_KEY` | *(empty)* | Bearer authentication token for Cloud AI providers |
+| `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Fallback URL for backward compatibility with Ollama |
+| `OLLAMA_MODEL` | `llama3.1:latest` | Fallback model name for backward compatibility with Ollama |
+
+---
+
+### 📋 Ready-to-Use `.env` Configurations
+
+#### Option A: Local Ollama (Default - Zero API Cost, 100% Privacy)
+Runs locally on your CPU or GPU without sending any data over the internet:
+```env
+AI_PROVIDER=ollama
+AI_BASE_URL=http://host.docker.internal:11434
+AI_MODEL=llama3.1:latest
+```
+
+#### Option B: OpenAI Cloud (`gpt-4o-mini`)
+```env
+AI_PROVIDER=openai
+AI_BASE_URL=https://api.openai.com/v1
+AI_MODEL=gpt-4o-mini
+AI_API_KEY=sk-proj-your-openai-api-key-here
+```
+
+#### Option C: Groq (Ultra-Fast Cloud Inference)
+```env
+AI_PROVIDER=openai
+AI_BASE_URL=https://api.groq.com/openai/v1
+AI_MODEL=llama-3.1-70b-versatile
+AI_API_KEY=gsk_your-groq-api-key-here
+```
+
+#### Option D: OpenRouter / DeepSeek / Custom Self-Hosted Proxy (vLLM)
+```env
+AI_PROVIDER=openai
+AI_BASE_URL=https://openrouter.ai/api/v1
+AI_MODEL=deepseek/deepseek-chat
+AI_API_KEY=sk-or-v1-your-openrouter-key-here
+```
 
 ---
 
