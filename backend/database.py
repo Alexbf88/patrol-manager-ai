@@ -155,3 +155,11 @@ def atualizar_turno(turno_id: int, data_inicio: str, data_fim: Optional[str], ho
     conn.commit()
     conn.close()
     return afetados > 0
+
+def obter_turno_por_id(turno_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None

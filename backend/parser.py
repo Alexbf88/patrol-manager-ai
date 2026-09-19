@@ -26,9 +26,9 @@ REMETENTES_IGNORADOS = {
 }
 
 # Regex para extrair horário retroativo mencionado na mensagem
-# Ex: "encerrado as 16.45", "encerrando 17:00", "encerrado 16h30", "encerrei as 18:00"
+# Ex: "encerrado as 16.45", "encerrando as 16.45", "encerrando 17:00", "encerrado 16h30", "encerrei as 18:00"
 HORARIO_RETROATIVO_REGEX = re.compile(
-    r"(?:encerrad[oa]|encerrei|encerramento|sa[ií]da)\s+(?:[aà]s\s+)?(\d{1,2})[:\.hH](\d{2})",
+    r"(?:encerr(?:ad[oa]|ando|ei|amento)|sa[ií]da)\s+(?:[aà]s\s+)?(\d{1,2})[:\.hH](\d{2})?",
     re.IGNORECASE
 )
 
@@ -87,7 +87,7 @@ def identificar_seguranca(remetente: str) -> Optional[str]:
         
     return None
 
-def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
+def parse_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
     linhas = conteudo_texto.splitlines()
     dt_min = datetime.strptime(data_minima, "%Y-%m-%d") if data_minima else None
 
@@ -154,6 +154,13 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
             "veiculo_tipo": v_tipo,
             "veiculo_cor": v_cor
         })
+    return mensagens_chat
+
+def extrair_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
+    return parse_mensagens_chat(conteudo_texto, data_minima)
+
+def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
+    mensagens_chat = parse_mensagens_chat(conteudo_texto, data_minima)
 
     turnos_finais = []
     msgs_por_seg = {}
@@ -245,7 +252,8 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                         # Verifica se na mensagem havia horário retroativo (ex: "encerrado as 16:45")
                         m_ret = HORARIO_RETROATIVO_REGEX.search(ultima_msg["mensagem"])
                         if m_ret:
-                            hr_h, hr_m = int(m_ret.group(1)), int(m_ret.group(2))
+                            hr_h = int(m_ret.group(1))
+                            hr_m = int(m_ret.group(2)) if m_ret.group(2) else 0
                             try:
                                 dt_fim = dt_fim.replace(hour=hr_h, minute=hr_m)
                             except Exception:
@@ -290,7 +298,8 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
                     # Verifica se no texto do fim tem horário retroativo especificado
                     m_ret = HORARIO_RETROATIVO_REGEX.search(item["mensagem"])
                     if m_ret:
-                        hr_h, hr_m = int(m_ret.group(1)), int(m_ret.group(2))
+                        hr_h = int(m_ret.group(1))
+                        hr_m = int(m_ret.group(2)) if m_ret.group(2) else 0
                         try:
                             dt_fim = dt_fim.replace(hour=hr_h, minute=hr_m)
                         except Exception:

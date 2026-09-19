@@ -8,3 +8,5 @@ rondas.db
 .DS_Store
 *.xlsx
 uploads/
+data/
+

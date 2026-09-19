@@ -8,8 +8,11 @@ import pandas as pd
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno, purgar_turnos
-from backend.parser import processar_chat_whatsapp
+from backend.database import init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno, purgar_turnos, obter_turno_por_id
+from backend.parser import processar_chat_whatsapp, extrair_mensagens_chat
+from backend.auditor_ia import auditar_turno_com_ollama
+
+CHAT_CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ultimo_chat.txt")
 
 app = FastAPI(title="Ronda Segurança API", version="1.0.0")
 
@@ -61,6 +64,14 @@ async def upload_chat(file: UploadFile = File(...)):
         except Exception:
             raise HTTPException(status_code=400, detail="Erro ao decodificar arquivo. Envie em formato UTF-8.")
             
+    # Salvar cache local para possibilitar auditoria por IA das mensagens daquele dia
+    try:
+        os.makedirs(os.path.dirname(CHAT_CACHE_PATH), exist_ok=True)
+        with open(CHAT_CACHE_PATH, "w", encoding="utf-8") as f:
+            f.write(texto)
+    except Exception as e:
+        print(f"Aviso ao salvar cache do chat: {e}")
+
     turnos = processar_chat_whatsapp(texto)
     total_salvos = salvar_turnos(turnos)
     
@@ -73,6 +84,32 @@ async def upload_chat(file: UploadFile = File(...)):
 def post_purgar():
     removidos = purgar_turnos()
     return {"mensagem": f"Base de dados purgada com sucesso! {removidos} turnos removidos.", "removidos": removidos}
+
+@app.post("/api/turnos/{turno_id}/auditar-ia")
+async def rota_auditar_ia(turno_id: int):
+    turno = obter_turno_por_id(turno_id)
+    if not turno:
+        raise HTTPException(status_code=404, detail="Turno não encontrado.")
+        
+    if not os.path.exists(CHAT_CACHE_PATH):
+        raise HTTPException(
+            status_code=400, 
+            detail="Arquivo de conversa não encontrado no cache. Faça o upload do arquivo .txt no topo da tela para habilitar a auditoria com IA."
+        )
+        
+    try:
+        with open(CHAT_CACHE_PATH, "r", encoding="utf-8") as f:
+            chat_texto = f.read()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao ler arquivo de chat em cache: {e}")
+        
+    mensagens = extrair_mensagens_chat(chat_texto)
+    resultado = await auditar_turno_com_ollama(turno, mensagens)
+    
+    if not resultado.get("sucesso"):
+        raise HTTPException(status_code=500, detail=resultado.get("mensagem", "Erro desconhecido na auditoria."))
+        
+    return resultado
 
 @app.get("/api/turnos")
 def get_turnos(
