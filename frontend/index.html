@@ -63,6 +63,9 @@
 
       <!-- Ações da aba ativa -->
       <div id="acoesTurnos" class="flex items-center gap-2">
+        <button onclick="abrirModalPagamento()" class="bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 px-3.5 rounded-lg flex items-center gap-2 text-xs transition shadow-md shadow-amber-900/30" title="Calcular valores devidos em reais com base nas horas trabalhadas">
+          <i class="fa-solid fa-calculator text-amber-200"></i> Calcular Valores a Pagar
+        </button>
         <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 text-xs transition shadow-md">
           <i class="fa-solid fa-file-excel"></i> Exportar Turnos (.xlsx)
         </button>
@@ -120,13 +123,13 @@
       </div>
 
       <!-- KPIs -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
           <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-lg text-2xl">
             <i class="fa-solid fa-clock"></i>
           </div>
           <div>
-            <span class="text-xs text-slate-400 font-medium">Horas no Período Selecionado</span>
+            <span class="text-xs text-slate-400 font-medium">Horas no Período</span>
             <h3 id="kpiHoras" class="text-2xl font-bold text-slate-100">0h</h3>
           </div>
         </div>
@@ -140,7 +143,7 @@
           </div>
         </div>
         <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4">
-          <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg text-2xl">
+          <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-lg text-2xl">
             <i class="fa-solid fa-user-shield"></i>
           </div>
           <div>
@@ -148,11 +151,41 @@
             <h3 id="kpiSegurancas" class="text-2xl font-bold text-slate-100">0</h3>
           </div>
         </div>
+        <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex items-center gap-4 cursor-pointer hover:border-amber-500/60 transition group" onclick="abrirModalPagamento()" title="Clique para abrir o demonstrativo de pagamento">
+          <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg text-2xl group-hover:scale-110 transition">
+            <i class="fa-solid fa-hand-holding-dollar"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+              Total a Pagar (Período) <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-amber-400"></i>
+            </span>
+            <h3 id="kpiValorTotal" class="text-2xl font-bold text-amber-400 font-mono">R$ 0,00</h3>
+          </div>
+        </div>
       </div>
 
       <!-- Resumo por Segurança no Período -->
       <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-        <h2 class="text-base font-semibold text-slate-200 mb-4">Total de Horas no Período por Segurança</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-700/60">
+          <div>
+            <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-wallet text-amber-400"></i> Total de Horas & Valores Devidos no Período
+            </h2>
+            <p class="text-xs text-slate-400">Defina o valor por hora para calcular automaticamente o valor devido a cada operador.</p>
+          </div>
+          <div class="flex items-center gap-2 bg-slate-900/90 border border-slate-700 px-3 py-1.5 rounded-lg shadow-inner">
+            <span class="text-xs text-amber-400 font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-coins"></i> Valor da Hora:
+            </span>
+            <div class="flex items-center">
+              <span class="text-xs text-slate-400 mr-1 font-mono">R$</span>
+              <input type="number" id="inputValorHoraGlobal" step="0.50" min="0" placeholder="20.00" oninput="aoMudarValorHoraGlobal(this.value)" class="w-24 bg-slate-800 border border-slate-600 rounded px-2.5 py-1 text-xs text-amber-300 font-bold font-mono focus:outline-none focus:border-amber-400 text-right">
+            </div>
+            <button onclick="abrirModalPagamento()" class="ml-1 text-xs bg-amber-600/90 hover:bg-amber-500 text-white px-3 py-1 rounded font-medium transition flex items-center gap-1.5 shadow-sm" title="Abrir Demonstrativo Completo">
+              <i class="fa-solid fa-receipt"></i> Demonstrativo
+            </button>
+          </div>
+        </div>
         <div id="cardsSegurancas" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <!-- Preenchido via JS -->
         </div>
@@ -428,6 +461,65 @@
     </div>
   </div>
 
+  <!-- Modal de Demonstrativo de Pagamento de Operadores -->
+  <div id="modalPagamento" class="fixed inset-0 bg-black/75 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4 animate-fade-in">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <div>
+          <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-file-invoice-dollar text-amber-400 text-lg"></i> Demonstrativo de Pagamento de Operadores
+          </h3>
+          <p id="subtituloModalPagamento" class="text-xs text-slate-400 mt-0.5">Período selecionado</p>
+        </div>
+        <button onclick="fecharModalPagamento()" class="text-slate-400 hover:text-slate-200 text-lg transition"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Barra de Controle do Valor da Hora Base -->
+      <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-inner">
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-slate-300 font-medium">Valor da Hora Base:</label>
+          <div class="flex items-center">
+            <span class="text-xs text-slate-400 mr-1 font-mono">R$</span>
+            <input type="number" id="modalInputValorHora" step="0.50" min="0" placeholder="20.00" oninput="aoMudarValorHoraGlobal(this.value)" class="w-24 bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-bold font-mono focus:outline-none focus:border-amber-400 text-right">
+          </div>
+          <span class="text-[11px] text-slate-400 italic hidden sm:inline">(aplicado a todos os operadores)</span>
+        </div>
+        <div class="text-right">
+          <span class="text-[11px] text-slate-400 block">Total Geral a Pagar:</span>
+          <span id="modalTotalGeralPagar" class="text-xl font-bold text-amber-400 font-mono">R$ 0,00</span>
+        </div>
+      </div>
+
+      <!-- Tabela de Operadores -->
+      <div class="overflow-y-auto flex-1 border border-slate-700/80 rounded-xl">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-900 text-slate-400 border-b border-slate-700 font-semibold uppercase tracking-wider text-[11px]">
+              <th class="py-2.5 px-3.5">Operador / Segurança</th>
+              <th class="py-2.5 px-3 text-center">Turnos</th>
+              <th class="py-2.5 px-3 text-center">Total Horas</th>
+              <th class="py-2.5 px-3 text-center">R$/Hora</th>
+              <th class="py-2.5 px-3.5 text-right">Valor Devido (R$)</th>
+            </tr>
+          </thead>
+          <tbody id="corpoTabelaPagamento" class="divide-y divide-slate-700/60 text-slate-200">
+            <!-- Preenchido via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Ações do Modal -->
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <button onclick="copiarResumoWhatsApp()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-2 shadow-md shadow-emerald-900/30">
+          <i class="fa-brands fa-whatsapp text-sm text-emerald-200"></i> Copiar Resumo para WhatsApp
+        </button>
+        <button onclick="fecharModalPagamento()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs font-medium text-slate-200 transition">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let turnosEmMemoria = [];
     let ocorrenciasEmMemoria = [];
@@ -490,35 +582,258 @@
       await Promise.all([carregarTurnos(), carregarResumo()]);
     }
 
+    let dadosResumoAtuais = null;
+    let valorHoraPadrao = parseFloat(localStorage.getItem('patrol_valor_hora') || '20.00');
+    let valoresHoraCustom = JSON.parse(localStorage.getItem('patrol_valores_custom') || '{}');
+
+    function formatarMoeda(val) {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+    }
+
+    function formatarDataBRSimples(iso) {
+      if (!iso) return '';
+      const p = iso.split('-');
+      if (p.length === 3) return `${p[2]}/${p[1]}/${p[0]}`;
+      return iso;
+    }
+
+    function obterValorHoraOperador(nome) {
+      if (valoresHoraCustom[nome] !== undefined && valoresHoraCustom[nome] !== null && !isNaN(valoresHoraCustom[nome]) && valoresHoraCustom[nome] !== '') {
+        return parseFloat(valoresHoraCustom[nome]);
+      }
+      return valorHoraPadrao;
+    }
+
+    function aoMudarValorHoraGlobal(val) {
+      const num = parseFloat(val);
+      if (!isNaN(num) && num >= 0) {
+        valorHoraPadrao = num;
+        localStorage.setItem('patrol_valor_hora', num.toString());
+      } else if (val === '') {
+        valorHoraPadrao = 0;
+      }
+      const modalInput = document.getElementById('modalInputValorHora');
+      if (modalInput && modalInput.value != val) {
+        modalInput.value = val;
+      }
+      const cardInput = document.getElementById('inputValorHoraGlobal');
+      if (cardInput && cardInput.value != val) {
+        cardInput.value = val;
+      }
+      renderizarCardsResumo();
+    }
+
+    function aoMudarValorHoraCustom(nome, val) {
+      const num = parseFloat(val);
+      if (!isNaN(num) && num >= 0) {
+        valoresHoraCustom[nome] = num;
+      } else {
+        delete valoresHoraCustom[nome];
+      }
+      localStorage.setItem('patrol_valores_custom', JSON.stringify(valoresHoraCustom));
+      renderizarCardsResumo();
+    }
+
+    function abrirModalPagamento() {
+      const dtIni = document.getElementById('filtroDataInicio').value;
+      const dtFim = document.getElementById('filtroDataFim').value;
+      let sub = 'Período: Todo o Histórico';
+      if (dtIni && dtFim) {
+        sub = `Período: ${formatarDataBRSimples(dtIni)} até ${formatarDataBRSimples(dtFim)}`;
+      } else if (dtIni) {
+        sub = `A partir de ${formatarDataBRSimples(dtIni)}`;
+      } else if (dtFim) {
+        sub = `Até ${formatarDataBRSimples(dtFim)}`;
+      }
+      document.getElementById('subtituloModalPagamento').innerText = sub;
+
+      const modalInput = document.getElementById('modalInputValorHora');
+      if (modalInput) {
+        modalInput.value = valorHoraPadrao > 0 ? valorHoraPadrao.toFixed(2) : '';
+      }
+
+      renderizarTabelaModalPagamento();
+      document.getElementById('modalPagamento').classList.remove('hidden');
+    }
+
+    function fecharModalPagamento() {
+      document.getElementById('modalPagamento').classList.add('hidden');
+    }
+
+    function renderizarTabelaModalPagamento() {
+      const tbody = document.getElementById('corpoTabelaPagamento');
+      const totalElem = document.getElementById('modalTotalGeralPagar');
+      if (!tbody || !dadosResumoAtuais) return;
+
+      tbody.innerHTML = '';
+      const lista = dadosResumoAtuais.por_seguranca || [];
+      if (lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">Nenhum operador com turnos no período filtrado.</td></tr>';
+        if (totalElem) totalElem.innerText = 'R$ 0,00';
+        return;
+      }
+
+      let soma = 0;
+      lista.forEach(s => {
+        const horasNum = parseFloat(s.total_horas) || 0;
+        const vh = obterValorHoraOperador(s.seguranca);
+        const devido = horasNum * vh;
+        soma += devido;
+        const horasFmt = s.total_horas_formatadas || formatarHM(horasNum);
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-900/50 transition">
+            <td class="py-3 px-3.5 font-semibold text-slate-200">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-user-shield text-slate-400"></i>
+                <span>${s.seguranca}</span>
+              </div>
+            </td>
+            <td class="py-3 px-3 text-center text-slate-300 font-mono">${s.total_turnos}</td>
+            <td class="py-3 px-3 text-center">
+              <span class="font-bold text-emerald-400 font-mono">${horasFmt}</span>
+              <span class="text-[10px] text-slate-500 block">(${horasNum.toFixed(2)}h)</span>
+            </td>
+            <td class="py-3 px-3 text-center">
+              <div class="inline-flex items-center">
+                <span class="text-slate-400 text-xs mr-1 font-mono">R$</span>
+                <input type="number" step="0.50" min="0" value="${vh.toFixed(2)}"
+                  oninput="aoMudarValorHoraCustom('${s.seguranca}', this.value)"
+                  class="w-20 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-amber-300 font-mono font-bold text-right focus:outline-none focus:border-amber-400">
+              </div>
+            </td>
+            <td class="py-3 px-3.5 text-right font-bold text-amber-400 font-mono text-sm">
+              ${formatarMoeda(devido)}
+            </td>
+          </tr>
+        `;
+      });
+
+      if (totalElem) {
+        totalElem.innerText = formatarMoeda(soma);
+      }
+    }
+
+    function copiarResumoWhatsApp() {
+      if (!dadosResumoAtuais || !dadosResumoAtuais.por_seguranca || dadosResumoAtuais.por_seguranca.length === 0) {
+        alert('Nenhum dado disponível no período selecionado.');
+        return;
+      }
+
+      const dtIni = document.getElementById('filtroDataInicio').value;
+      const dtFim = document.getElementById('filtroDataFim').value;
+      let periodoTxt = 'Período Completo';
+      if (dtIni && dtFim) {
+        periodoTxt = `${formatarDataBRSimples(dtIni)} a ${formatarDataBRSimples(dtFim)}`;
+      } else if (dtIni) {
+        periodoTxt = `A partir de ${formatarDataBRSimples(dtIni)}`;
+      } else if (dtFim) {
+        periodoTxt = `Até ${formatarDataBRSimples(dtFim)}`;
+      }
+
+      let totalGeral = 0;
+      let linhas = [];
+      dadosResumoAtuais.por_seguranca.forEach(s => {
+        const horasFmt = s.total_horas_formatadas || formatarHM(s.total_horas);
+        const vh = obterValorHoraOperador(s.seguranca);
+        const devido = (parseFloat(s.total_horas) || 0) * vh;
+        totalGeral += devido;
+        linhas.push(`👤 *${s.seguranca}*: ${horasFmt} (${s.total_turnos} turnos) × ${formatarMoeda(vh)}/h = *${formatarMoeda(devido)}*`);
+      });
+
+      const texto = `🛡️ *DEMONSTRATIVO DE FECHAMENTO DE HORAS & VALORES*
+📅 *Período:* ${periodoTxt}
+----------------------------------------
+${linhas.join('\n')}
+----------------------------------------
+💵 *TOTAL GERAL A PAGAR: ${formatarMoeda(totalGeral)}*
+
+_Gerado por Patrol Manager AI_`;
+
+      navigator.clipboard.writeText(texto).then(() => {
+        alert('✅ Demonstrativo copiado com sucesso para a área de transferência! Pronto para colar no WhatsApp.');
+      }).catch(() => {
+        prompt('Copie o demonstrativo abaixo:', texto);
+      });
+    }
+
+    function renderizarCardsResumo() {
+      if (!dadosResumoAtuais) return;
+
+      const inputGlobal = document.getElementById('inputValorHoraGlobal');
+      if (inputGlobal && !inputGlobal.value && valorHoraPadrao > 0) {
+        inputGlobal.value = valorHoraPadrao.toFixed(2);
+      }
+
+      const container = document.getElementById('cardsSegurancas');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const lista = dadosResumoAtuais.por_seguranca || [];
+      if (lista.length === 0) {
+        container.innerHTML = '<div class="text-sm text-slate-500 col-span-3">Nenhum registro para o período selecionado.</div>';
+        const kpiV = document.getElementById('kpiValorTotal');
+        if (kpiV) kpiV.innerText = 'R$ 0,00';
+        return;
+      }
+
+      let totalGeralDevido = 0;
+
+      lista.forEach(s => {
+        const horasNum = parseFloat(s.total_horas) || 0;
+        const vh = obterValorHoraOperador(s.seguranca);
+        const devido = horasNum * vh;
+        totalGeralDevido += devido;
+
+        const horasFmt = s.total_horas_formatadas || formatarHM(horasNum);
+        const mediaFmt = s.media_horas_formatadas || formatarHM(s.media_horas);
+
+        container.innerHTML += `
+          <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition shadow-sm">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-slate-200">${s.seguranca}</span>
+                <span class="text-[11px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-400 font-mono">${s.total_turnos} turnos</span>
+              </div>
+              <div class="text-2xl font-bold text-emerald-400 mt-1">${horasFmt}</div>
+              <div class="text-xs text-slate-400 mt-0.5">Média: ${mediaFmt}/turno</div>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+              <div>
+                <span class="text-[11px] text-slate-400 block">Total Devido (${formatarMoeda(vh)}/h):</span>
+                <span class="text-base font-bold text-amber-400 font-mono">${formatarMoeda(devido)}</span>
+              </div>
+              <button onclick="abrirModalPagamento()" class="text-[11px] text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1 font-medium">
+                <i class="fa-solid fa-receipt"></i> Detalhar
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      const kpiV = document.getElementById('kpiValorTotal');
+      if (kpiV) kpiV.innerText = formatarMoeda(totalGeralDevido);
+
+      const modalPag = document.getElementById('modalPagamento');
+      if (modalPag && !modalPag.classList.contains('hidden')) {
+        renderizarTabelaModalPagamento();
+      }
+    }
+
     async function carregarResumo() {
       const q = obterParametrosFiltro();
       try {
         const res = await fetch('/api/resumo?' + q);
         const data = await res.json();
-        
+        dadosResumoAtuais = data;
+
         const totalHorasTxt = data.geral.total_horas_formatadas || formatarHM(data.geral.total_horas || 0);
         document.getElementById('kpiHoras').innerText = totalHorasTxt;
         document.getElementById('kpiTurnos').innerText = data.geral.total_turnos || 0;
         document.getElementById('kpiSegurancas').innerText = data.por_seguranca.length || 0;
 
-        const container = document.getElementById('cardsSegurancas');
-        container.innerHTML = '';
-        if (data.por_seguranca.length === 0) {
-          container.innerHTML = '<div class="text-sm text-slate-500 col-span-3">Nenhum registro para o período selecionado.</div>';
-          return;
-        }
-
-        data.por_seguranca.forEach(s => {
-          const horasFmt = s.total_horas_formatadas || formatarHM(s.total_horas);
-          const mediaFmt = s.media_horas_formatadas || formatarHM(s.media_horas);
-          container.innerHTML += `
-            <div class="bg-slate-900/80 border border-slate-700/80 rounded-lg p-4">
-              <div class="text-sm font-semibold text-slate-200">${s.seguranca}</div>
-              <div class="text-2xl font-bold text-emerald-400 mt-1">${horasFmt}</div>
-              <div class="text-xs text-slate-400 mt-1">${s.total_turnos} turnos (méd. ${mediaFmt}/turno)</div>
-            </div>
-          `;
-        });
+        renderizarCardsResumo();
       } catch (e) {
         console.error("Erro ao carregar resumo", e);
       }
