@@ -14,11 +14,19 @@ EXAMPLE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "c
 
 def carregar_configuracao_contatos():
     target_path = CONFIG_PATH if os.path.exists(CONFIG_PATH) else EXAMPLE_CONFIG_PATH
+    guards = {}
+    ignored_senders = set()
+    photo_patrol_guards = {"Alexandre Santos", "Carlos Oliveira", "Lucas Ferreira"}
+
     if os.path.exists(target_path):
         try:
             with open(target_path, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
-                return cfg.get("guards", {}), set(cfg.get("ignored_senders", []))
+                guards = cfg.get("guards", {})
+                ignored_senders = set(cfg.get("ignored_senders", []))
+                if "photo_patrol_guards" in cfg:
+                    photo_patrol_guards = set(cfg["photo_patrol_guards"])
+                return guards, ignored_senders, photo_patrol_guards
         except Exception as e:
             print(f"Aviso ao carregar {target_path}: {e}")
             
@@ -28,20 +36,17 @@ def carregar_configuracao_contatos():
         "Marcos Silva": "Marcos Silva",
         "+55 11 99999-0002": "Carlos Oliveira",
         "Carlos Oliveira": "Carlos Oliveira",
-        "Carlos Oliveira": "Carlos Oliveira",
         "+55 11 99999-0003": "Alexandre Santos",
         "+55 11 999990001": "Alexandre Santos",
         "Alexandre Santos": "Alexandre Santos",
         "+55 15 99999-0004": "Lucas Ferreira",
         "Lucas Ferreira": "Lucas Ferreira",
-        "Lucas Ferreira": "Lucas Ferreira",
-        "Eduardo Lima": "Eduardo Lima",
         "Eduardo Lima": "Eduardo Lima"
     }
     padrao_ignorados = {"Servicos Gerais - Terceirizado", "+55 11 99999-0005", "Administracao"}
-    return padrao_guards, padrao_ignorados
+    return padrao_guards, padrao_ignorados, photo_patrol_guards
 
-MAPA_CONTATOS, REMETENTES_IGNORADOS = carregar_configuracao_contatos()
+MAPA_CONTATOS, REMETENTES_IGNORADOS, RONDAS_FOTOGRAFICAS_GUARDS = carregar_configuracao_contatos()
 
 # Regex para extrair horário retroativo mencionado na mensagem
 # Ex: "encerrado as 16.45", "encerrando as 16.45", "encerrando 17:00", "encerrado 16h30", "encerrei as 18:00"
@@ -50,23 +55,57 @@ HORARIO_RETROATIVO_REGEX = re.compile(
     re.IGNORECASE
 )
 
-def parse_data_hora(data_str: str, hora_str: str) -> Optional[datetime]:
+def detectar_formato_data(linhas: List[str], max_linhas: int = 2500) -> str:
+    """Analisa as primeiras linhas para determinar se o chat usa DD/MM/AAAA ou MM/DD/AAAA."""
+    dmy_count = 0
+    mdy_count = 0
+    for linha in linhas[:max_linhas]:
+        m = re.match(r"^(\d{1,2})/(\d{1,2})/\d{2,4}", linha.strip())
+        if m:
+            p1, p2 = int(m.group(1)), int(m.group(2))
+            if p1 > 12 and p2 <= 12:
+                dmy_count += 1
+            elif p2 > 12 and p1 <= 12:
+                mdy_count += 1
+    return "MDY" if mdy_count > dmy_count else "DMY"
+
+def parse_data_hora(data_str: str, hora_str: str, formato_padrao: str = "DMY") -> Optional[datetime]:
     partes = data_str.split('/')
     if len(partes) != 3:
         return None
     
-    p1, p2, p3 = int(partes[0]), int(partes[1]), int(partes[2])
+    try:
+        p1, p2, p3 = int(partes[0]), int(partes[1]), int(partes[2])
+    except ValueError:
+        return None
+
     if p3 < 100:
         p3 += 2000
+
+    hora_partes = hora_str.split(':')
+    if len(hora_partes) < 2:
+        return None
+    try:
+        hh, mm = int(hora_partes[0]), int(hora_partes[1])
+    except ValueError:
+        return None
         
     try:
         if p1 > 12:
-            return datetime(p3, p2, p1, int(hora_str.split(':')[0]), int(hora_str.split(':')[1]))
+            # Claramente Dia/Mês/Ano
+            return datetime(p3, p2, p1, hh, mm)
+        elif p2 > 12:
+            # Claramente Mês/Dia/Ano
+            return datetime(p3, p1, p2, hh, mm)
         else:
-            return datetime(p3, p1, p2, int(hora_str.split(':')[0]), int(hora_str.split(':')[1]))
+            # Ambíguo (ambos <= 12) -> usa o formato detectado no chat
+            if formato_padrao == "MDY":
+                return datetime(p3, p1, p2, hh, mm)
+            else:
+                return datetime(p3, p2, p1, hh, mm)
     except ValueError:
         try:
-            return datetime(p3, p2, p1, int(hora_str.split(':')[0]), int(hora_str.split(':')[1]))
+            return datetime(p3, p1, p2, hh, mm) if formato_padrao == "DMY" else datetime(p3, p2, p1, hh, mm)
         except ValueError:
             return None
 
@@ -90,26 +129,77 @@ def extrair_veiculo(texto: str):
             
     return tipo, cor
 
-def identificar_seguranca(remetente: str) -> Optional[str]:
+def identificar_seguranca(remetente: str, mapa_contatos: Optional[Dict[str, str]] = None) -> Optional[str]:
     rem = remetente.strip()
+    mapa = mapa_contatos if mapa_contatos is not None else MAPA_CONTATOS
     
     for ign in REMETENTES_IGNORADOS:
         if ign in rem:
             return None
 
-    if rem in MAPA_CONTATOS:
-        return MAPA_CONTATOS[rem]
-    if rem in MAPA_CONTATOS.values():
+    if rem in mapa:
+        return mapa[rem]
+    if rem in mapa.values():
         return rem
-    for tel, nome in MAPA_CONTATOS.items():
+    for tel, nome in mapa.items():
         if tel in rem or nome in rem:
             return nome
         
     return None
 
-def parse_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
+def auto_descobrir_guardas(mensagens_brutas: List[Dict[str, Any]], mapa_existente: Dict[str, str]) -> Dict[str, str]:
+    """Descobre nomes de seguranças a partir das mensagens de início de serviço e números de telefone."""
+    mapa_descoberto = dict(mapa_existente)
+    palavras_ignorar = {
+        'de', 'com', 'em', 'da', 'do', 'na', 'no', 'portaria', 'moto', 'carro', 'viatura',
+        'parcial', 'almoço', 'serviço', 'servicos', 'serviços', 'trabalho', 'retornando'
+    }
+
+    for mb in mensagens_brutas:
+        rem = mb["remetente"].strip()
+        if any(ign in rem for ign in REMETENTES_IGNORADOS):
+            continue
+
+        # Se já estiver mapeado no config com um nome de confiança, não sobrescreve
+        if rem in mapa_descoberto and not re.match(r"^\+?\d[\d\s\-]+$", mapa_descoberto[rem]):
+            continue
+
+        msg = mb["mensagem"]
+        # Limpa anotações de mídia ou anexos antes de extrair nome
+        msg_limpa = re.sub(r'<[^>]+>', ' ', msg)
+        msg_limpa = re.sub(r'IMG-\d+-WA\d+\.[a-zA-Z0-9]+(?:\s*\([^)]*\))?', ' ', msg_limpa).strip()
+
+        # Nome antes de "iniciando/reiniciando/início de serviço" (ex: "Portugal iniciando o serviço", "Domingues, Iniciando serviço", "Mazinho iniciando serviço")
+        m1 = re.search(r'(?:^|[,\.\n]|\b(?:dia|tarde|noite)\s+)([A-Za-zÀ-ÖØ-öø-ÿ]{3,20})[\s,]+(?:iniciando|reiniciando|in[ií]cio\s+de)\s+(?:os\s+|o\s+)?serviço', msg_limpa, re.IGNORECASE)
+        if m1:
+            nome = m1.group(1).strip()
+            if nome.lower() not in ['bom', 'boa', 'olá', 'ola'] and nome.lower() not in palavras_ignorar:
+                mapa_descoberto[rem] = nome
+                continue
+
+        # Nome após "iniciando serviço" (ex: "Iniciando serviço, Diego, carro preto", "Iniciando serviços carro branco.Eder Milton")
+        m2 = re.search(r'(?:iniciando|reiniciando)\s+(?:os\s+|o\s+)?serviço[s]?[\s,\.]+(?:(?:de\s+)?(?:carro|moto|viatura)[^,\.]*[\s,\.]+)?([A-Za-zÀ-ÖØ-öø-ÿ\s]{3,25})', msg_limpa, re.IGNORECASE)
+        if m2:
+            cand = m2.group(1).strip()
+            # Limpa palavras de veículos ou stop words que possam vir no final do match
+            cand = re.split(r'\b(?:carro|moto|viatura|gol|palio|corsa|preto|preta|branco|branca|cinza|prata|laranja|vermelho|azul)\b', cand, flags=re.IGNORECASE)[0].strip(" ,.-")
+            cand_first = cand.split()[0].lower() if cand else ''
+            if cand_first and cand_first not in palavras_ignorar and len(cand) >= 3:
+                mapa_descoberto[rem] = cand
+                continue
+
+        # Se o próprio remetente já for um nome textual e enviou início/fim de serviço
+        msg_lower = msg.lower()
+        if any(k in msg_lower for k in ["iniciando", "reiniciando", "encerrando", "encerrado"]):
+            if not re.match(r"^\+?\d[\d\s\-]+$", rem) and len(rem) >= 3 and rem not in mapa_descoberto:
+                mapa_descoberto[rem] = rem
+
+    return mapa_descoberto
+
+def parse_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = None) -> List[Dict[str, Any]]:
     linhas = conteudo_texto.splitlines()
     dt_min = datetime.strptime(data_minima, "%Y-%m-%d") if data_minima else None
+    formato_data = detectar_formato_data(linhas)
 
     # 1. Agrupar mensagens preservando legendas de fotos e quebras de linha
     mensagens_brutas = []
@@ -130,9 +220,12 @@ def parse_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = "2026
             if mensagens_brutas:
                 mensagens_brutas[-1]["mensagem"] += " " + linha.strip()
 
+    # Auto-descoberta dinâmica de guardas para chats reais
+    mapa_contatos_ativo = auto_descobrir_guardas(mensagens_brutas, MAPA_CONTATOS)
+
     mensagens_chat = []
     for mb in mensagens_brutas:
-        dt = parse_data_hora(mb["data_str"], mb["hora_str"])
+        dt = parse_data_hora(mb["data_str"], mb["hora_str"], formato_padrao=formato_data)
         if not dt:
             continue
             
@@ -140,7 +233,7 @@ def parse_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = "2026
             continue
 
         rem_limpo = mb["remetente"]
-        seguranca = identificar_seguranca(rem_limpo)
+        seguranca = identificar_seguranca(rem_limpo, mapa_contatos_ativo)
         if not seguranca:
             continue
 
@@ -176,10 +269,11 @@ def parse_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = "2026
         })
     return mensagens_chat
 
-def extrair_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
+def extrair_mensagens_chat(conteudo_texto: str, data_minima: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Extrai e enriquece mensagens do chat com metadados de segurança e evento (alias para parse_mensagens_chat)."""
     return parse_mensagens_chat(conteudo_texto, data_minima)
 
-def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
+def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = None) -> List[Dict[str, Any]]:
     mensagens_chat = parse_mensagens_chat(conteudo_texto, data_minima)
 
     turnos_finais = []
@@ -188,8 +282,8 @@ def processar_chat_whatsapp(conteudo_texto: str, data_minima: Optional[str] = "2
         msgs_por_seg.setdefault(m["seguranca"], []).append(m)
 
     for seg, msgs in msgs_por_seg.items():
-        # Para Alexandre Santos, Carlos Oliveira e Lucas Ferreira (rondas contínuas por fotos/relatos)
-        if seg in ["Alexandre Santos", "Carlos Oliveira", "Lucas Ferreira"]:
+        # Para rondas contínuas por fotos/relatos configuradas em contacts.json
+        if seg in RONDAS_FOTOGRAFICAS_GUARDS:
             blocos = []
             bloco_atual = []
             

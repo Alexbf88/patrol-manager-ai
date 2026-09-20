@@ -4,16 +4,18 @@
     "Marcos Silva": "Marcos Silva",
     "+55 11 99999-0002": "Carlos Oliveira",
     "Carlos Oliveira": "Carlos Oliveira",
-    "Carlos Oliveira": "Carlos Oliveira",
     "+55 11 99999-0003": "Alexandre Santos",
     "+55 11 999990001": "Alexandre Santos",
     "Alexandre Santos": "Alexandre Santos",
     "+55 15 99999-0004": "Lucas Ferreira",
     "Lucas Ferreira": "Lucas Ferreira",
-    "Lucas Ferreira": "Lucas Ferreira",
-    "Eduardo Lima": "Eduardo Lima",
     "Eduardo Lima": "Eduardo Lima"
   },
+  "photo_patrol_guards": [
+    "Alexandre Santos",
+    "Carlos Oliveira",
+    "Lucas Ferreira"
+  ],
   "ignored_senders": [
     "Servicos Gerais - Terceirizado",
     "+55 11 99999-0005",

@@ -6,7 +6,9 @@ DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), ".."
 
 def get_db():
     os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -47,6 +49,8 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ocorrencias_data ON ocorrencias(data_hora);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ocorrencias_severidade ON ocorrencias(severidade);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ocorrencias_categoria ON ocorrencias(categoria);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_turnos_data_inicio ON turnos(data_inicio DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_turnos_seguranca ON turnos(seguranca);")
     conn.commit()
     conn.close()
 
@@ -54,6 +58,15 @@ def purgar_turnos() -> int:
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM turnos")
+    removidos = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return removidos
+
+def remover_seguranca(nome_seguranca: str) -> int:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM turnos WHERE seguranca = ?", (nome_seguranca,))
     removidos = cursor.rowcount
     conn.commit()
     conn.close()

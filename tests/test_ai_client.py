@@ -66,3 +66,36 @@ async def test_chamar_ia_json_cloud_mock(monkeypatch):
         assert sucesso is True, f"Failed with: {msg}"
         assert data["data_fim_sugerida"] == "2026-08-20 18:00"
         assert data["confianca"] == "Alta"
+
+@pytest.mark.anyio
+async def test_chamar_ia_json_cloud_fallback_without_response_format(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("AI_API_KEY", "test-key")
+    monkeypatch.setenv("AI_BASE_URL", "https://api.openai.com/v1")
+    monkeypatch.setenv("AI_MODEL", "custom-model")
+
+    dummy_request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    # First call with response_format fails with 400
+    fail_resp = httpx.Response(400, text="response_format is not supported by this model", request=dummy_request)
+    # Second fallback call succeeds with 200
+    ok_resp = httpx.Response(
+        200,
+        json={
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"data_fim_sugerida": "2026-08-20 19:00", "confianca": "Média"}'
+                    }
+                }
+            ]
+        },
+        request=dummy_request
+    )
+
+    with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = [fail_resp, ok_resp]
+        sucesso, data, msg = await chamar_ia_json("Analise o turno")
+        assert sucesso is True, f"Failed with: {msg}"
+        assert data["data_fim_sugerida"] == "2026-08-20 19:00"
+        assert data["confianca"] == "Média"
+        assert mock_post.call_count == 2

@@ -34,7 +34,19 @@ async def auditar_turno_com_ollama(turno: Dict[str, Any], mensagens_chat: list) 
             "mensagem": "Não foram encontradas mensagens do segurança para este dia."
         }
         
-    contexto_msgs = "\n".join(msgs_relevantes[-20:]) # Até 20 mensagens mais recentes do turno
+    if len(msgs_relevantes) <= 30:
+        msgs_selecionadas = msgs_relevantes
+    else:
+        # Preserva mensagens de início, menções a encerramento/horário e mensagens finais
+        indices = set(range(min(5, len(msgs_relevantes))))
+        indices.update(range(max(0, len(msgs_relevantes) - 20), len(msgs_relevantes)))
+        termos_chave = ("encerr", "saida", "saída", "conclu", "fim", "final", "rendi", "almoco", "almoço", "horário", "horario")
+        for i, texto in enumerate(msgs_relevantes):
+            if any(t in texto.lower() for t in termos_chave):
+                indices.add(i)
+        msgs_selecionadas = [msgs_relevantes[i] for i in sorted(indices)]
+
+    contexto_msgs = "\n".join(msgs_selecionadas)
     
     prompt = f"""Você é um auditor de turnos de segurança patrimonial.
 O segurança '{seguranca}' iniciou o plantão em {dt_inicio.strftime('%d/%m/%Y %H:%M')}.

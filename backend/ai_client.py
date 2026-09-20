@@ -73,7 +73,15 @@ async def chamar_ia_json(
                 "response_format": {"type": "json_object"},
                 "temperature": 0.1
             }
-            resp = await client.post(url, headers=headers, json=payload)
+            resp = await client.post(url, headers=headers, json=payload, timeout=timeout)
+            if resp.status_code != 200 and "response_format" in payload:
+                # Fallback: tentar sem response_format para modelos/provedores incompatíveis
+                payload_fallback = dict(payload)
+                del payload_fallback["response_format"]
+                resp_fallback = await client.post(url, headers=headers, json=payload_fallback, timeout=timeout)
+                if resp_fallback.status_code == 200:
+                    resp = resp_fallback
+
             if resp.status_code != 200:
                 return False, None, f"Erro na API Cloud ({resp.status_code}): {resp.text}"
             
@@ -95,7 +103,7 @@ async def chamar_ia_json(
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
 
-            resp = await client.post(url, headers=headers, json=payload)
+            resp = await client.post(url, headers=headers, json=payload, timeout=timeout)
             if resp.status_code != 200:
                 return False, None, f"Erro na API Ollama ({resp.status_code}): {resp.text}"
 

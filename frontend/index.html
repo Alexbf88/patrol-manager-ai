@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel de Rondas - Controle de Horas</title>
+  <title>Ronda Portugal - Painel de Rondas</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -15,7 +15,7 @@
       <div class="flex items-center gap-3">
         <i class="fa-solid fa-shield-halved text-emerald-400 text-2xl"></i>
         <div>
-          <h1 class="text-xl font-bold tracking-wide">Ronda Marcos Silva</h1>
+          <h1 class="text-xl font-bold tracking-wide">Ronda Portugal</h1>
           <p class="text-xs text-slate-400">Controle e Auditoria de Horas de Segurança</p>
         </div>
       </div>
@@ -225,6 +225,35 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Controles de Paginação -->
+        <div id="paginacaoTurnos" class="p-4 border-t border-slate-700 bg-slate-900/40 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <span>Itens por página:</span>
+            <select id="itensPorPagina" onchange="mudarItensPorPagina(this.value)" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-indigo-500">
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="all">Todos</option>
+            </select>
+            <span id="infoPaginacao" class="ml-2 font-medium text-slate-300"></span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button id="btnPagPrimeira" onclick="irParaPagina(1)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition" title="Primeira página">
+              <i class="fa-solid fa-angles-left"></i>
+            </button>
+            <button id="btnPagAnterior" onclick="irParaPagina(paginaAtual - 1)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition" title="Página anterior">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <span id="badgePaginaAtual" class="px-3 py-1 bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 font-semibold rounded">1</span>
+            <button id="btnPagProxima" onclick="irParaPagina(paginaAtual + 1)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition" title="Próxima página">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            <button id="btnPagUltima" onclick="irParaPagina(totalPaginas)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition" title="Última página">
+              <i class="fa-solid fa-angles-right"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -500,6 +529,7 @@
               <th class="py-2.5 px-3 text-center">Total Horas</th>
               <th class="py-2.5 px-3 text-center">R$/Hora</th>
               <th class="py-2.5 px-3.5 text-right">Valor Devido (R$)</th>
+              <th class="py-2.5 px-2.5 text-center">Ações</th>
             </tr>
           </thead>
           <tbody id="corpoTabelaPagamento" class="divide-y divide-slate-700/60 text-slate-200">
@@ -524,6 +554,9 @@
     let turnosEmMemoria = [];
     let ocorrenciasEmMemoria = [];
     let abaAtiva = 'turnos';
+    let paginaAtual = 1;
+    let itensPorPagina = 50;
+    let totalPaginas = 1;
 
     function alternarAba(aba) {
       abaAtiva = aba;
@@ -634,6 +667,43 @@
       renderizarCardsResumo();
     }
 
+    async function removerSeguranca(nome) {
+      if (!confirm(`Tem certeza que deseja remover o segurança "${nome}" e todos os seus turnos associados?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/segurancas/${encodeURIComponent(nome)}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          // Limpa do filtro select se estivesse selecionado
+          const selectFiltro = document.getElementById('filtroNome');
+          if (selectFiltro) {
+            if (selectFiltro.value === nome) selectFiltro.value = '';
+            for (let i = 0; i < selectFiltro.options.length; i++) {
+              if (selectFiltro.options[i].value === nome) {
+                selectFiltro.remove(i);
+                break;
+              }
+            }
+          }
+          // Remove valor/hora customizado se houver
+          if (valoresHoraCustom[nome] !== undefined) {
+            delete valoresHoraCustom[nome];
+            localStorage.setItem('patrol_valores_custom', JSON.stringify(valoresHoraCustom));
+          }
+          await carregarDados();
+        } else {
+          alert('Erro ao remover segurança: ' + (data.detail || 'Erro desconhecido'));
+        }
+      } catch (e) {
+        alert('Falha na comunicação com o servidor: ' + e);
+      }
+    }
+
     function abrirModalPagamento() {
       const dtIni = document.getElementById('filtroDataInicio').value;
       const dtFim = document.getElementById('filtroDataFim').value;
@@ -704,6 +774,11 @@
             </td>
             <td class="py-3 px-3.5 text-right font-bold text-amber-400 font-mono text-sm">
               ${formatarMoeda(devido)}
+            </td>
+            <td class="py-3 px-2.5 text-center">
+              <button onclick="removerSeguranca('${s.seguranca}')" class="text-xs bg-slate-800 hover:bg-rose-600/80 text-slate-400 hover:text-white px-2 py-1 rounded transition flex items-center gap-1 mx-auto" title="Remover operador e seus turnos">
+                <i class="fa-solid fa-trash-can text-[11px]"></i>
+              </button>
             </td>
           </tr>
         `;
@@ -792,8 +867,13 @@ _Gerado por Patrol Manager AI_`;
           <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition shadow-sm">
             <div>
               <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-slate-200">${s.seguranca}</span>
-                <span class="text-[11px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-400 font-mono">${s.total_turnos} turnos</span>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="text-sm font-semibold text-slate-200 truncate" title="${s.seguranca}">${s.seguranca}</span>
+                  <button onclick="removerSeguranca('${s.seguranca}')" class="text-slate-500 hover:text-rose-400 p-1 transition rounded hover:bg-slate-800" title="Remover segurança e seus turnos">
+                    <i class="fa-solid fa-user-xmark text-xs"></i>
+                  </button>
+                </div>
+                <span class="text-[11px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-400 font-mono flex-shrink-0">${s.total_turnos} turnos</span>
               </div>
               <div class="text-2xl font-bold text-emerald-400 mt-1">${horasFmt}</div>
               <div class="text-xs text-slate-400 mt-0.5">Média: ${mediaFmt}/turno</div>
@@ -833,6 +913,23 @@ _Gerado por Patrol Manager AI_`;
         document.getElementById('kpiTurnos').innerText = data.geral.total_turnos || 0;
         document.getElementById('kpiSegurancas').innerText = data.por_seguranca.length || 0;
 
+        // Atualizar dinamicamente o select de seguranças com os nomes reais da base
+        const selectFiltro = document.getElementById('filtroNome');
+        if (selectFiltro && data.por_seguranca) {
+          const valorSelecionado = selectFiltro.value;
+          const nomesExistentes = new Set(Array.from(selectFiltro.options).map(o => o.value));
+          data.por_seguranca.forEach(s => {
+            if (s.seguranca && !nomesExistentes.has(s.seguranca)) {
+              const opt = document.createElement('option');
+              opt.value = s.seguranca;
+              opt.textContent = s.seguranca;
+              selectFiltro.appendChild(opt);
+              nomesExistentes.add(s.seguranca);
+            }
+          });
+          selectFiltro.value = valorSelecionado;
+        }
+
         renderizarCardsResumo();
       } catch (e) {
         console.error("Erro ao carregar resumo", e);
@@ -863,57 +960,118 @@ _Gerado por Patrol Manager AI_`;
           return;
         }
 
-        turnos.forEach(t => {
-          let badgeStatus = 'bg-slate-700 text-slate-300';
-          let rowHighlight = '';
-
-          if (t.status === 'Concluído') {
-            badgeStatus = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-          } else if (t.status.includes('Ajustado')) {
-            badgeStatus = 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
-            rowHighlight = 'bg-cyan-950/10';
-          } else if (t.status.includes('atividade') || t.status.includes('Sem') || t.status.includes('Atenção')) {
-            // DESTAQUE EM AMARELO/ÂMBAR PARA CHAMAR ATENÇÃO DO GESTOR
-            badgeStatus = 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold';
-            rowHighlight = 'bg-amber-950/20 hover:bg-amber-950/30';
-          } else if (t.status.includes('fotográfico')) {
-            badgeStatus = 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
-          }
-
-          const veiculo = [t.veiculo_tipo, t.veiculo_cor].filter(Boolean).join(' ') || 'Não informado';
-          const inicioFormatado = t.data_inicio_br || t.data_inicio;
-          const fimFormatado = t.data_fim_br || t.data_fim || '-';
-          const duracao = t.horas_formatadas || formatarHM(t.horas_trabalhadas);
-
-          tbody.innerHTML += `
-            <tr class="${rowHighlight} hover:bg-slate-700/30 transition border-b border-slate-700/60">
-              <td class="py-3 px-4 font-medium text-slate-200 flex items-center gap-2">
-                ${t.status.includes('atividade') ? '<i class="fa-solid fa-triangle-exclamation text-amber-400 text-xs" title="Horário de fim estimado por foto (sem mensagem formal de encerramento)"></i>' : ''}
-                ${t.seguranca}
-              </td>
-              <td class="py-3 px-4 text-slate-400">${veiculo}</td>
-              <td class="py-3 px-4 font-mono text-xs">${inicioFormatado}</td>
-              <td class="py-3 px-4 font-mono text-xs">${fimFormatado}</td>
-              <td class="py-3 px-4 font-semibold text-emerald-400">${duracao}</td>
-              <td class="py-3 px-4">
-                <span class="px-2.5 py-1 rounded-full text-xs font-medium ${badgeStatus}">${t.status}</span>
-              </td>
-              <td class="py-3 px-4 text-center whitespace-nowrap">
-                <div class="flex items-center justify-center gap-1.5">
-                  <button id="btn-ia-${t.id}" onclick="auditarComIA(${t.id})" class="text-xs ${t.status.includes('atividade') || t.status.includes('Sem') || t.status.includes('Atenção') ? 'bg-purple-600 hover:bg-purple-500 text-white font-medium ring-2 ring-purple-400/50 shadow-md' : 'bg-purple-950/80 hover:bg-purple-700 text-purple-200 border border-purple-500/30'} px-2.5 py-1.5 rounded-lg transition flex items-center gap-1" title="Auditar turno com IA Local (Ollama Llama 3.1)">
-                    <i class="fa-solid fa-wand-magic-sparkles text-xs"></i> <span>IA</span>
-                  </button>
-                  <button onclick="abrirModalEdicao(${t.id})" class="text-xs bg-slate-700/80 hover:bg-indigo-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg transition flex items-center gap-1" title="Ajustar horário manualmente">
-                    <i class="fa-solid fa-pen-to-square"></i> <span>Ajustar</span>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          `;
-        });
+        totalPaginas = itensPorPagina === 'all' ? 1 : Math.ceil(turnos.length / itensPorPagina);
+        if (paginaAtual > totalPaginas) paginaAtual = 1;
+        renderizarTabelaTurnos();
       } catch (e) {
         console.error("Erro ao carregar turnos", e);
       }
+    }
+
+    function mudarItensPorPagina(val) {
+      itensPorPagina = val === 'all' ? 'all' : parseInt(val, 10);
+      paginaAtual = 1;
+      totalPaginas = itensPorPagina === 'all' ? 1 : Math.ceil(turnosEmMemoria.length / itensPorPagina);
+      renderizarTabelaTurnos();
+    }
+
+    function irParaPagina(p) {
+      if (p < 1 || p > totalPaginas) return;
+      paginaAtual = p;
+      renderizarTabelaTurnos();
+    }
+
+    function renderizarTabelaTurnos() {
+      const tbody = document.getElementById('tabelaCorpo');
+      if (!tbody) return;
+
+      const total = turnosEmMemoria.length;
+      if (total === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 space-y-2">
+          <div class="text-base font-semibold text-slate-300">Nenhum turno encontrado com os filtros ativos.</div>
+          <div class="text-xs text-slate-500">Verifique se as datas de início/fim ou o segurança possuem registros na base.</div>
+        </td></tr>`;
+        atualizarBotoesPaginacao(0, 0, 0);
+        return;
+      }
+
+      totalPaginas = itensPorPagina === 'all' ? 1 : Math.ceil(total / itensPorPagina);
+      if (paginaAtual > totalPaginas) paginaAtual = totalPaginas;
+
+      const inicioIdx = itensPorPagina === 'all' ? 0 : (paginaAtual - 1) * itensPorPagina;
+      const fimIdx = itensPorPagina === 'all' ? total : Math.min(inicioIdx + itensPorPagina, total);
+      const paginaTurnos = turnosEmMemoria.slice(inicioIdx, fimIdx);
+
+      const htmlLinhas = paginaTurnos.map(t => {
+        let badgeStatus = 'bg-slate-700 text-slate-300';
+        let rowHighlight = '';
+
+        if (t.status === 'Concluído') {
+          badgeStatus = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        } else if (t.status.includes('Ajustado')) {
+          badgeStatus = 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+          rowHighlight = 'bg-cyan-950/10';
+        } else if (t.status.includes('atividade') || t.status.includes('Sem') || t.status.includes('Atenção')) {
+          badgeStatus = 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold';
+          rowHighlight = 'bg-amber-950/20 hover:bg-amber-950/30';
+        } else if (t.status.includes('fotográfico')) {
+          badgeStatus = 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
+        }
+
+        const veiculo = [t.veiculo_tipo, t.veiculo_cor].filter(Boolean).join(' ') || 'Não informado';
+        const inicioFormatado = t.data_inicio_br || t.data_inicio;
+        const fimFormatado = t.data_fim_br || t.data_fim || '-';
+        const duracao = t.horas_formatadas || formatarHM(t.horas_trabalhadas);
+
+        return `
+          <tr class="${rowHighlight} hover:bg-slate-700/30 transition border-b border-slate-700/60">
+            <td class="py-3 px-4 font-medium text-slate-200 flex items-center gap-2">
+              ${t.status.includes('atividade') ? '<i class="fa-solid fa-triangle-exclamation text-amber-400 text-xs" title="Horário de fim estimado por foto (sem mensagem formal de encerramento)"></i>' : ''}
+              ${t.seguranca}
+            </td>
+            <td class="py-3 px-4 text-slate-400">${veiculo}</td>
+            <td class="py-3 px-4 font-mono text-xs">${inicioFormatado}</td>
+            <td class="py-3 px-4 font-mono text-xs">${fimFormatado}</td>
+            <td class="py-3 px-4 font-semibold text-emerald-400">${duracao}</td>
+            <td class="py-3 px-4">
+              <span class="px-2.5 py-1 rounded-full text-xs font-medium ${badgeStatus}">${t.status}</span>
+            </td>
+            <td class="py-3 px-4 text-center whitespace-nowrap">
+              <div class="flex items-center justify-center gap-1.5">
+                <button id="btn-ia-${t.id}" onclick="auditarComIA(${t.id})" class="text-xs ${t.status.includes('atividade') || t.status.includes('Sem') || t.status.includes('Atenção') ? 'bg-purple-600 hover:bg-purple-500 text-white font-medium ring-2 ring-purple-400/50 shadow-md' : 'bg-purple-950/80 hover:bg-purple-700 text-purple-200 border border-purple-500/30'} px-2.5 py-1.5 rounded-lg transition flex items-center gap-1" title="Auditar turno com IA Local (Ollama Llama 3.1)">
+                  <i class="fa-solid fa-wand-magic-sparkles text-xs"></i> <span>IA</span>
+                </button>
+                <button onclick="abrirModalEdicao(${t.id})" class="text-xs bg-slate-700/80 hover:bg-indigo-600 text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg transition flex items-center gap-1" title="Ajustar horário manualmente">
+                  <i class="fa-solid fa-pen-to-square"></i> <span>Ajustar</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.innerHTML = htmlLinhas;
+      atualizarBotoesPaginacao(inicioIdx + 1, fimIdx, total);
+    }
+
+    function atualizarBotoesPaginacao(de, ate, total) {
+      const info = document.getElementById('infoPaginacao');
+      const badge = document.getElementById('badgePaginaAtual');
+      const btnPri = document.getElementById('btnPagPrimeira');
+      const btnAnt = document.getElementById('btnPagAnterior');
+      const btnProx = document.getElementById('btnPagProxima');
+      const btnUlt = document.getElementById('btnPagUltima');
+
+      if (info) {
+        info.innerText = total > 0 ? `Mostrando ${de}–${ate} de ${total}` : '0 registros';
+      }
+      if (badge) {
+        badge.innerText = `${paginaAtual} / ${totalPaginas || 1}`;
+      }
+      if (btnPri) btnPri.disabled = paginaAtual <= 1;
+      if (btnAnt) btnAnt.disabled = paginaAtual <= 1;
+      if (btnProx) btnProx.disabled = paginaAtual >= totalPaginas;
+      if (btnUlt) btnUlt.disabled = paginaAtual >= totalPaginas;
     }
 
     function abrirModalEdicao(turnoId, dadosSugeridos = null) {

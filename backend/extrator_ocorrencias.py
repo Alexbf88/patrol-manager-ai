@@ -189,7 +189,11 @@ Se não houver nenhuma ocorrência relevante no bloco, retorne: {{"ocorrencias":
         print(f"Erro ao processar lote no Ollama: {e}")
         return []
 
-async def extrair_todas_ocorrencias(chat_texto: str, data_minima_str: Optional[str] = "2026-06-01") -> List[Dict[str, Any]]:
+async def extrair_todas_ocorrencias(
+    chat_texto: str,
+    data_minima_str: Optional[str] = "2026-06-01",
+    limite_threads: Optional[int] = None
+) -> List[Dict[str, Any]]:
     dt_min = None
     if data_minima_str:
         try:
@@ -201,8 +205,11 @@ async def extrair_todas_ocorrencias(chat_texto: str, data_minima_str: Optional[s
     if not threads:
         return []
         
-    # Priorizar os threads mais recentes (ex: até 50 threads dos últimos meses para extração rápida e concisa)
-    threads_para_processar = threads[-50:]
+    # Se definido limite, processa os mais recentes; senão analisa todos
+    if limite_threads and limite_threads > 0:
+        threads_para_processar = threads[-limite_threads:]
+    else:
+        threads_para_processar = threads
     
     TAMANHO_LOTE = 8
     ocorrencias_totais = []

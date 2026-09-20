@@ -1,5 +1,6 @@
 import os
 import io
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
@@ -10,7 +11,7 @@ from typing import Optional, Dict, Any
 
 from backend.database import (
     init_db, salvar_turnos, listar_turnos, obter_resumo, atualizar_turno, purgar_turnos, obter_turno_por_id,
-    salvar_ocorrencias, listar_ocorrencias, obter_resumo_ocorrencias, deletar_ocorrencia, purgar_ocorrencias
+    remover_seguranca, salvar_ocorrencias, listar_ocorrencias, obter_resumo_ocorrencias, deletar_ocorrencia, purgar_ocorrencias
 )
 from backend.parser import processar_chat_whatsapp, extrair_mensagens_chat
 from backend.auditor_ia import auditar_turno_com_ollama
@@ -18,19 +19,23 @@ from backend.extrator_ocorrencias import extrair_todas_ocorrencias
 
 CHAT_CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ultimo_chat.txt")
 
-app = FastAPI(title="Ronda Segurança API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+app = FastAPI(title="Ronda Segurança API", version="1.0.0", lifespan=lifespan)
+
+cors_origins_env = os.environ.get("CORS_ORIGINS", "*")
+allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins if allowed_origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-def startup():
-    init_db()
 
 @app.get("/healthz", tags=["Observability"])
 def healthz():
@@ -104,6 +109,18 @@ async def upload_chat(file: UploadFile = File(...)):
 def post_purgar():
     removidos = purgar_turnos()
     return {"mensagem": f"Base de dados purgada com sucesso! {removidos} turnos removidos.", "removidos": removidos}
+
+@app.delete("/api/segurancas/{nome}")
+def delete_seguranca(nome: str):
+    nome_limpo = nome.strip()
+    if not nome_limpo:
+        raise HTTPException(status_code=400, detail="Nome do segurança inválido.")
+    removidos = remover_seguranca(nome_limpo)
+    return {
+        "mensagem": f"Segurança '{nome_limpo}' removido com sucesso. {removidos} turno(s) excluído(s).",
+        "removidos": removidos,
+        "seguranca": nome_limpo
+    }
 
 @app.post("/api/turnos/{turno_id}/auditar-ia")
 async def rota_auditar_ia(turno_id: int):
@@ -236,7 +253,10 @@ def exportar_excel(
 # ----------------- ROTAS DE OCORRÊNCIAS (LIVRO DIGITAL) -----------------
 
 @app.post("/api/ocorrencias/extrair")
-async def rota_extrair_ocorrencias(data_minima: Optional[str] = Query("2026-06-01")):
+async def rota_extrair_ocorrencias(
+    data_minima: Optional[str] = Query("2026-06-01"),
+    limite: Optional[int] = Query(None, description="Limite de conversas/threads a processar (opcional)")
+):
     if not os.path.exists(CHAT_CACHE_PATH):
         raise HTTPException(
             status_code=400,
@@ -249,7 +269,7 @@ async def rota_extrair_ocorrencias(data_minima: Optional[str] = Query("2026-06-0
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao ler arquivo de chat: {e}")
         
-    ocorrencias = await extrair_todas_ocorrencias(chat_texto, data_minima_str=data_minima)
+    ocorrencias = await extrair_todas_ocorrencias(chat_texto, data_minima_str=data_minima, limite_threads=limite)
     total_inseridos = salvar_ocorrencias(ocorrencias)
     
     return {
